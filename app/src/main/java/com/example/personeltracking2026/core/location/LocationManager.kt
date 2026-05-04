@@ -3,11 +3,14 @@ package com.example.personeltracking2026.core.location
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
+import android.os.Handler
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.google.android.gms.common.ConnectionResult
 import com.google.android.gms.common.GoogleApiAvailability
@@ -36,8 +39,8 @@ class AppLocationManager(private val context: Context) {
     private var locationManager: LocationManager? = null
     private var gpsListener: LocationListener? = null
     private var networkListener: LocationListener? = null
-
     private var bestLocation: Location? = null
+    private var satelliteCount = 0
     private var intervalMs: Long = 5000L // default 5 detik
 
     fun setInterval(ms: Long) {
@@ -50,6 +53,17 @@ class AppLocationManager(private val context: Context) {
             return
         }
 
+        locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        try {
+            locationManager?.registerGnssStatusCallback(
+                gnssCallback,
+                Handler(Looper.getMainLooper())
+            )
+        } catch (e: SecurityException) {
+            onLocationError?.invoke("GNSS permission denied")
+        }
+
         if (isPlayServicesAvailable) {
             startFusedUpdates()
         } else {
@@ -58,6 +72,7 @@ class AppLocationManager(private val context: Context) {
     }
 
     fun stopUpdates() {
+        locationManager?.unregisterGnssStatusCallback(gnssCallback)
         stopFusedUpdates()
         stopLegacyUpdates()
     }
@@ -105,6 +120,15 @@ class AppLocationManager(private val context: Context) {
 
     private fun startLegacyUpdates() {
         locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        try {
+            locationManager?.registerGnssStatusCallback(
+                gnssCallback,
+                Handler(Looper.getMainLooper())
+            )
+        } catch (e: SecurityException) {
+            onLocationError?.invoke("GNSS permission denied")
+        }
 
         val locationListener = object : LocationListener {
             override fun onLocationChanged(location: Location) {
@@ -160,6 +184,9 @@ class AppLocationManager(private val context: Context) {
     }
 
     private fun stopLegacyUpdates() {
+        gnssCallback.let {
+            locationManager?.unregisterGnssStatusCallback(it)
+        }
         gpsListener?.let { locationManager?.removeUpdates(it) }
         networkListener?.let { locationManager?.removeUpdates(it) }
         gpsListener = null
@@ -201,6 +228,17 @@ class AppLocationManager(private val context: Context) {
             isNewer && !isSignificantlyLessAccurate -> true
             isNewer && !isSignificantlyLessAccurate && isFromSameProvider -> true
             else -> false
+        }
+    }
+
+    private val gnssCallback = object : GnssStatus.Callback() {
+        override fun onSatelliteStatusChanged(status: GnssStatus) {
+            var usedInFix = 0
+            for (i in 0 until status.satelliteCount) {
+                if (status.usedInFix(i)) usedInFix++
+            }
+            satelliteCount = usedInFix
+            Log.d("GNSS_DEBUG", "Total: ${status.satelliteCount}, Used: $usedInFix")
         }
     }
 }
