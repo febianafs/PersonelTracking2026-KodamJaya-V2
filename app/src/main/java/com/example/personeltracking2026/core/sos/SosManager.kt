@@ -21,7 +21,7 @@ object SosManager {
     private var serialNumber: String = "unknown"
     private var androidId: String = "unknown"
     private var deviceType: DeviceType = DeviceType.RADIO
-    private var getLocation: (() -> Pair<Double, Double>)? = null
+    private var getLocation: (() -> Triple<Double, Double, Float>)? = null
 
     fun init(
         mqtt: MqttManager,
@@ -29,7 +29,7 @@ object SosManager {
         serial: String,
         id: String,
         type: DeviceType,
-        locationProvider: () -> Pair<Double, Double>
+        locationProvider: () -> Triple<Double, Double, Float>
     ) {
         mqttManager    = mqtt
         sessionManager = session
@@ -46,7 +46,7 @@ object SosManager {
     private fun publishSos(sosValue: Int) {
         val mqtt    = mqttManager ?: return
         val session = sessionManager ?: return
-        val (lat, lon) = getLocation?.invoke() ?: return
+        val (lat, lon, accuracy) = getLocation?.invoke() ?: return
 
         when (deviceType) {
             DeviceType.RADIO -> {
@@ -56,6 +56,7 @@ object SosManager {
                     androidId    = androidId,
                     lat          = lat,
                     lon          = lon,
+                    acc          = accuracy,
                     sos          = sosValue
                 )
                 mqtt.publishRadioSos(payload)

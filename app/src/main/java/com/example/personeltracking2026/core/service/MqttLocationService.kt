@@ -186,7 +186,7 @@ class MqttLocationService : Service() {
             if (now - lastPublishTime >= publishIntervalMs) {
                 lastPublishTime = now
                 Log.d(TAG, "Location [$source]: $lat, $lon → publishing")
-                publishLocation(lat, lon)
+                publishLocation(lat, lon, accuracy)
             } else {
                 Log.d(TAG, "Location [$source]: throttled, skip")
             }
@@ -224,7 +224,7 @@ class MqttLocationService : Service() {
     //  Publish MQTT
     // ─────────────────────────────────────────────
 
-    private fun publishLocation(lat: Double, lon: Double) {
+    private fun publishLocation(lat: Double, lon: Double, accuracy: Float) {
         serviceScope.launch {
             val mqttManager = (application as App).mqttManager
             if (!mqttManager.isConnected()) {
@@ -255,6 +255,7 @@ class MqttLocationService : Service() {
                 androidId    = androidId,
                 lat          = lat,
                 lon          = lon,
+                acc          = accuracy,
                 gpsTimestamp = nowMs,
                 heartrate    = hr,
                 heartrateTs  = hrTs,

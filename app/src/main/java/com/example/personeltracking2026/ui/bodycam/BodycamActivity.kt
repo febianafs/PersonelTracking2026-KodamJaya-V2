@@ -159,7 +159,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             serial           = serial,
             id               = androidId,
             type             = SosManager.DeviceType.BODYCAM,
-            locationProvider = { Pair(app.currentLat, app.currentLon) }
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
 
         WindowCompat.setDecorFitsSystemWindows(window, true)
@@ -224,7 +224,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             serial           = identity.serial,
             id               = identity.androidId,
             type             = SosManager.DeviceType.BODYCAM,
-            locationProvider = { Pair(app.currentLat, app.currentLon) }
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
     }
 

@@ -99,7 +99,7 @@ class BluetoothActivity : BaseActivity() {
             serial           = identity.serial,
             id               = identity.androidId,
             type             = SosManager.DeviceType.RADIO,
-            locationProvider = { Pair(app.currentLat, app.currentLon) } // atau bisa diganti kalau ada location
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) } // atau bisa diganti kalau ada location
         )
 
         initViews()

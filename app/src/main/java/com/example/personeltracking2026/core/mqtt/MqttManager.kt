@@ -276,6 +276,7 @@ class MqttManager(private val context: Context) {
                 put("gps_timestamp", p.gps.gpsTimestamp)
                 put("latitude", p.gps.latitude)
                 put("longitude", p.gps.longitude)
+                put("accuracy",p.gps.accuracy)
             })
 
             put("radio_health", JSONObject().apply {
@@ -306,6 +307,7 @@ class MqttManager(private val context: Context) {
             put("sos", p.sos)
             put("latitude", p.latitude)
             put("longitude", p.longitude)
+            put("accuracy",p.accuracy)
         }.toString()
     }
 

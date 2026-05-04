@@ -321,6 +321,7 @@ class PersonelViewModel(
             androidId    = androidId,
             lat          = location.lat,
             lon          = location.lon,
+            acc          = location.accuracy,
             gpsTimestamp = location.timestamp,
             heartrate    = hr.bpm,
             heartrateTs  = if (hr.timestamp > 0) hr.timestamp else System.currentTimeMillis(),
@@ -422,6 +423,7 @@ class PersonelViewModel(
             androidId    = androidId,
             lat          = loc.lat,
             lon          = loc.lon,
+            acc          = loc.accuracy,
             sos          = sosValue
         )
         mqttManager.publishRadioSos(payload)

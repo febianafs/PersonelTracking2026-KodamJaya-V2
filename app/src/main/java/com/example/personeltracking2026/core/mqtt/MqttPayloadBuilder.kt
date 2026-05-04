@@ -37,6 +37,7 @@ object MqttPayloadBuilder {
         androidId: String,
         lat: Double,
         lon: Double,
+        acc: Float,
         gpsTimestamp: Long,
         heartrate: Int,
         heartrateTs: Long,
@@ -66,7 +67,8 @@ object MqttPayloadBuilder {
             gps = GpsPayload(
                 gpsTimestamp = gpsTimestamp,
                 latitude = lat,
-                longitude = lon
+                longitude = lon,
+                accuracy = acc
             ),
             radioHealth = RadioHealthPayload(
                 heartrateTimestamp = heartrateTs,
@@ -96,6 +98,7 @@ object MqttPayloadBuilder {
         androidId: String,
         lat: Double,
         lon: Double,
+        acc: Float,
         sos: Int
     ): RadioSosPayload {
         val nowSec = System.currentTimeMillis() / 1000
@@ -108,7 +111,8 @@ object MqttPayloadBuilder {
             avatarUrl    = session.getAvatar() ?: "",
             sos          = sos,
             latitude     = lat,
-            longitude    = lon
+            longitude    = lon,
+            accuracy     = acc
         )
     }
 

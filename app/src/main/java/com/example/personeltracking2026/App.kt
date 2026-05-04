@@ -14,6 +14,7 @@ class App : Application() {
     @Volatile var currentHeartRateTs : Long = 0L
     @Volatile var currentLat: Double = 0.0
     @Volatile var currentLon: Double = 0.0
+    @Volatile var currentAccuracy: Float = 999f
 
     override fun onCreate() {
         super.onCreate()

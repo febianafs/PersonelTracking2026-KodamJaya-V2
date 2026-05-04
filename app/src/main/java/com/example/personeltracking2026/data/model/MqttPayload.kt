@@ -30,7 +30,8 @@ data class IdentityPayload(
 data class GpsPayload(
     @SerializedName("gps_timestamp")  val gpsTimestamp: Long,
     @SerializedName("latitude")       val latitude: Double,
-    @SerializedName("longitude")      val longitude: Double
+    @SerializedName("longitude")      val longitude: Double,
+    @SerializedName("accuracy")       val accuracy: Float,
 )
 
 data class RadioHealthPayload(
@@ -58,7 +59,8 @@ data class RadioSosPayload(
     @SerializedName("avatar")        val avatarUrl: String,
     @SerializedName("sos")           val sos: Int,
     @SerializedName("latitude")      val latitude: Double,
-    @SerializedName("longitude")     val longitude: Double
+    @SerializedName("longitude")     val longitude: Double,
+    @SerializedName("accuracy")      val accuracy: Float
 )
 
 // ─── TOPIC: bodycam/data ────────────────────────────────────────────────────────

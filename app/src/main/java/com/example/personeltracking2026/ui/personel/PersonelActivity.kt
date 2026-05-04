@@ -193,7 +193,7 @@ class PersonelActivity : BaseActivity() {
             serial           = identity.serial,
             id               = identity.androidId,
             type             = SosManager.DeviceType.RADIO,
-            locationProvider = { Pair(app.currentLat, app.currentLon) }
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
 
         binding.btnZoomIn.setOnClickListener {
@@ -281,7 +281,7 @@ class PersonelActivity : BaseActivity() {
             serial           = identity.serial,
             id               = identity.androidId,
             type             = SosManager.DeviceType.RADIO,
-            locationProvider = { Pair(app.currentLat, app.currentLon) }
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
     }
 
