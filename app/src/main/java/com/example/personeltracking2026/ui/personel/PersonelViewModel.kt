@@ -202,15 +202,19 @@ class PersonelViewModel(
             when (val result = repository.getPersonelDetail(userId, token)) {
                 is Result.Success -> {
                     val data = result.data
-                    // Simpan detail ke session supaya tersedia meski API gagal berikutnya
+
+                    val safeAvatar = data.avatar_url
+                        ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
+
                     sessionManager.savePersonelDetail(
                         nrp       = data.nrp,
                         rank      = data.rank?.name,
                         unit      = data.unit?.name,
                         battalion = data.batalyon?.name,
                         squad     = data.regu?.name,
-                        avatar    = data.image
+                        avatar    = safeAvatar
                     )
+
                     withContext(Dispatchers.Main) {
                         _personelState.value = PersonelState.Success(data)
                     }

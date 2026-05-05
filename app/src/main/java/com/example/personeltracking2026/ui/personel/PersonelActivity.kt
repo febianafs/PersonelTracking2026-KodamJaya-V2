@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
@@ -469,9 +471,19 @@ class PersonelActivity : BaseActivity() {
     }
 
     private fun bindPersonelData(data: PersonelData) {
+        val avatarFromApi = data.avatar_url
+        val avatarFromSession = sessionManager.getAvatar()
+
+        Log.d("AVATAR_CHECK", "avatarFromApi = $avatarFromApi")
+        Log.d("AVATAR_CHECK", "avatarFromSession = $avatarFromSession")
+
+        pagerAdapter.avatarUrl = avatarFromApi
+            ?: avatarFromSession.takeIf { it.isNotBlank() }
+
         pagerAdapter.name = sessionManager.getName() ?: "-"
         pagerAdapter.nrp = sessionManager.getUsername() ?: "-"
-        pagerAdapter.rank = sessionManager.getRank() ?: "-"
+        pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+
         pagerAdapter.notifyItemChanged(0)
     }
 
@@ -484,19 +496,26 @@ class PersonelActivity : BaseActivity() {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_personel, null)
 
-        // ambil data dari ViewModel
         val name = sessionManager.getName() ?: "-"
         val nrp  = sessionManager.getUsername() ?: "-"
         val personel = (viewModel.personelState.value as? PersonelState.Success)?.data
-        val location = viewModel.locationState.value.data
 
-        // SET DATA
         view.findViewById<TextView>(R.id.tvName).text = name
         view.findViewById<TextView>(R.id.tvNRP).text = nrp
         view.findViewById<TextView>(R.id.tvRank).text = personel?.rank?.name ?: "-"
         view.findViewById<TextView>(R.id.tvUnit).text = personel?.unit?.name ?: "-"
         view.findViewById<TextView>(R.id.tvSquad).text = personel?.regu?.name ?: "-"
-//        view.findViewById<TextView>(R.id.tvPersonelStatus).text = "Active"
+
+        val avatarUrl = personel?.avatar_url
+            ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
+
+        val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
+
+        Glide.with(this)
+            .load(avatarUrl)
+            .placeholder(R.drawable.ic_avatar)
+            .error(R.drawable.ic_avatar)
+            .into(imgProfile)
 
         dialog.setContentView(view)
         dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED

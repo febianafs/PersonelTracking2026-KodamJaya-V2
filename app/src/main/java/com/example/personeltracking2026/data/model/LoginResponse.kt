@@ -8,8 +8,18 @@ data class LoginResponse(
 )
 
 data class LoginData(
+    val profile: ProfileData?,
     val token: String,
     val user: UserData
+)
+
+data class ProfileData(
+    val id: Int?,
+    val user_id: Int?,
+    val full_name: String?,
+    val phone_number: String?,
+    val date_of_birth: String?,
+    val avatar_url: String?
 )
 
 data class UserData(

@@ -2,6 +2,7 @@ package com.example.personeltracking2026.ui.login
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.activity.viewModels
@@ -67,8 +68,18 @@ class LoginActivity : AppCompatActivity() {
                             binding.btnLogin.isEnabled = true
 
                             val token = state.data.data?.token ?: ""
-                            val name = state.data.data?.user?.name ?: ""
-                            SessionManager(this@LoginActivity).saveSession(token, name)
+
+                            val name = state.data.data?.profile?.full_name
+                                ?: state.data.data?.user?.name
+                                ?: ""
+
+                            val avatarUrl = state.data.data?.profile?.avatar_url ?: ""
+
+                            val sessionManager = SessionManager(this@LoginActivity)
+                            sessionManager.saveSession(token, name)
+                            sessionManager.saveAvatar(avatarUrl)
+
+                            Log.d("LOGIN_AVATAR", "avatarUrl = $avatarUrl")
 
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)
                             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

@@ -7,6 +7,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import android.widget.ImageView
+import com.bumptech.glide.Glide
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.ui.settings.SettingsActivity
 
@@ -21,6 +23,7 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     var name: String = "-"
     var nrp: String = "-"
     var rank: String = "-"
+    var avatarUrl: String? = null
     var lastSync: String = "-"
     var latitude: Double = 0.0
     var longitude: Double = 0.0
@@ -73,7 +76,18 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         when (holder) {
-            is ProfileVH -> holder.bind(name, nrp, rank, latitude, longitude, battery, lastSync, statusColor, onFullDataClick)
+            is ProfileVH -> holder.bind(
+                name,
+                nrp,
+                rank,
+                latitude,
+                longitude,
+                battery,
+                lastSync,
+                statusColor,
+                avatarUrl,
+                onFullDataClick
+            )
             is VitalVH   -> holder.bind(heartRate, lastSync, statusColor, bleDeviceName, bleConnected, bleBpm)
             is MqttVH    -> holder.bind(mqttHost, mqttPort, interval, lastSync, statusColor)
         }
@@ -84,29 +98,40 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     // ══════════════════════════════════════════════════════════════════════
 
     class ProfileVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        private val imgAvatar  = itemView.findViewById<ImageView?>(R.id.imgAvatar)
         private val tvName     = itemView.findViewById<TextView?>(R.id.tvName)
         private val tvNRP      = itemView.findViewById<TextView?>(R.id.tvNRP)
         private val tvRank     = itemView.findViewById<TextView>(R.id.tvRank)
-//        private val tvLat      = itemView.findViewById<TextView>(R.id.tvLat)
-//        private val tvLon      = itemView.findViewById<TextView>(R.id.tvLon)
         private val tvBattery  = itemView.findViewById<TextView?>(R.id.tvBattery)
         private val tvLastSync = itemView.findViewById<TextView?>(R.id.tvLastSync)
         private val dot        = itemView.findViewById<View>(R.id.dotLastSync)
         private val btnFullData = itemView.findViewById<TextView>(R.id.btnDataSelengkapnya)
 
         fun bind(
-            name: String, nrp: String, rank: String,
-            latitude: Double, longitude: Double,
-            battery: Int, lastSync: String, statusColor: String,
+            name: String,
+            nrp: String,
+            rank: String,
+            latitude: Double,
+            longitude: Double,
+            battery: Int,
+            lastSync: String,
+            statusColor: String,
+            avatarUrl: String?,
             onFullDataClick: (() -> Unit)? = null
         ) {
             tvName?.text     = name
             tvNRP?.text      = nrp
             tvRank?.text     = rank
-//            tvLat?.text      = "Lat : $latitude"
-//            tvLon?.text      = "Lon : $longitude"
             tvBattery?.text  = "$battery%"
             tvLastSync?.text = lastSync
+
+            imgAvatar?.let { imageView ->
+                Glide.with(itemView.context)
+                    .load(avatarUrl)
+                    .placeholder(R.drawable.ic_avatar)
+                    .error(R.drawable.ic_avatar)
+                    .into(imageView)
+            }
 
             val parsedColor = android.graphics.Color.parseColor(statusColor)
             tvLastSync?.setTextColor(parsedColor)
@@ -115,7 +140,6 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             btnFullData.setOnClickListener { onFullDataClick?.invoke() }
         }
     }
-
     class VitalVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val tvHeartRate   = itemView.findViewById<TextView?>(R.id.tvHeartRate)
         private val tvLastSync    = itemView.findViewById<TextView?>(R.id.tvLastSync)

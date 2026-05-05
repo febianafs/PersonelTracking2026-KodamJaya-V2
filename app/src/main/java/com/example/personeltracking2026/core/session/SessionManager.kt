@@ -46,6 +46,12 @@ class SessionManager(context: Context) {
         prefs.edit().putString(KEY_NRP, nrp).apply()
     }
 
+    fun saveAvatar(avatar: String?) {
+        prefs.edit()
+            .putString(KEY_AVATAR, avatar ?: "")
+            .apply()
+    }
+
     fun getToken()   : String? = prefs.getString(KEY_TOKEN, null)
     fun getName()    : String? = prefs.getString(KEY_NAME, null)
     fun getRole()    : String? = prefs.getString(KEY_ROLE, null)

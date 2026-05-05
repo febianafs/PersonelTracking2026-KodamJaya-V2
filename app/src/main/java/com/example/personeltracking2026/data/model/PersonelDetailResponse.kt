@@ -11,7 +11,7 @@ data class PersonelData(
     val id: Int,
     val nrp: String?,
     val email: String?,
-    val image: String?,
+    val avatar_url: String?,
     val batalyon: UnitItem?,
     val brigade: UnitItem?,
     val client: UnitItem?,
