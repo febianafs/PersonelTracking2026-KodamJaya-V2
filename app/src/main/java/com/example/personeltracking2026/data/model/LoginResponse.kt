@@ -9,8 +9,10 @@ data class LoginResponse(
 
 data class LoginData(
     val profile: ProfileData?,
-    val token: String,
-    val user: UserData
+    val client: ClientData?,
+    val user: UserData?,
+    val token: String?,
+    val path_access_roles: List<String>?
 )
 
 data class ProfileData(
@@ -19,15 +21,39 @@ data class ProfileData(
     val full_name: String?,
     val phone_number: String?,
     val date_of_birth: String?,
-    val avatar_url: String?
+    val avatar_url: String?,
+    val created_at: String?,
+    val updated_at: String?,
+    val satuan: SimpleNameData?,
+    val batalyon: SimpleNameData?,
+    val rank: SimpleNameData?,
+    val regu: SimpleNameData?
+)
+
+data class ClientData(
+    val name: String?,
+    val amount_of_personel_data: Int?,
+    val url_image: String?,
+    val desc: String?
 )
 
 data class UserData(
-    val name: String,
-    val roles: List<RoleData>
+    val id: Int?,
+    val name: String?,
+    val email: String?,
+    val username: String?,
+    val client_id: Int?,
+    val is_moderator: Boolean?,
+    val roles: List<RoleData>?
 )
 
 data class RoleData(
-    val id: Int,
-    val name: String
+    val id: Int?,
+    val name: String?,
+    val alias: String?
+)
+
+data class SimpleNameData(
+    val id: Int? = null,
+    val name: String?
 )

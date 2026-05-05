@@ -74,12 +74,15 @@ class LoginActivity : AppCompatActivity() {
                                 ?: ""
 
                             val avatarUrl = state.data.data?.profile?.avatar_url ?: ""
+                            val nrp = state.data.data?.user?.username ?: ""
 
                             val sessionManager = SessionManager(this@LoginActivity)
                             sessionManager.saveSession(token, name)
                             sessionManager.saveAvatar(avatarUrl)
+                            sessionManager.saveNrp(nrp)
 
                             Log.d("LOGIN_AVATAR", "avatarUrl = $avatarUrl")
+                            Log.d("LOGIN_NAME", "name = $name")
 
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)
                             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

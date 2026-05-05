@@ -26,6 +26,6 @@ data class PersonelData(
 )
 
 data class UnitItem(
-    val id: Int,
+    val id: Int? = null,
     val name: String?
 )

@@ -476,12 +476,13 @@ class PersonelActivity : BaseActivity() {
 
         Log.d("AVATAR_CHECK", "avatarFromApi = $avatarFromApi")
         Log.d("AVATAR_CHECK", "avatarFromSession = $avatarFromSession")
+        Log.d("PROFILE_NAME_CHECK", "nameFromSession = ${sessionManager.getName()}")
 
         pagerAdapter.avatarUrl = avatarFromApi
             ?: avatarFromSession.takeIf { it.isNotBlank() }
 
         pagerAdapter.name = sessionManager.getName() ?: "-"
-        pagerAdapter.nrp = sessionManager.getUsername() ?: "-"
+        pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
         pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
 
         pagerAdapter.notifyItemChanged(0)
@@ -497,7 +498,7 @@ class PersonelActivity : BaseActivity() {
         val view = layoutInflater.inflate(R.layout.bottom_sheet_personel, null)
 
         val name = sessionManager.getName() ?: "-"
-        val nrp  = sessionManager.getUsername() ?: "-"
+        val nrp = sessionManager.getNrp().ifBlank { "-" }
         val personel = (viewModel.personelState.value as? PersonelState.Success)?.data
 
         view.findViewById<TextView>(R.id.tvName).text = name
