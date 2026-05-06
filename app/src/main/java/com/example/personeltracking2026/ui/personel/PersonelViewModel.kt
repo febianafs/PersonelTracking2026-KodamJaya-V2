@@ -337,6 +337,7 @@ class PersonelViewModel(
         RadioDataPayload::class.java.declaredFields.forEach {
             Log.d("FIELDS", it.name)
         }
+        Log.d("HR_DEBUG", "PUBLISH HR = ${hr.bpm}")
     }
 
     private fun processLocation(newLoc: LocationData): LocationData? {
@@ -445,6 +446,7 @@ class PersonelViewModel(
             app.currentHeartRate   = bpm
             app.currentHeartRateTs = System.currentTimeMillis()
         }
+        Log.d("HR_DEBUG", "UPDATE HR = $bpm")
     }
 
     fun onBleConnected(deviceName: String) {

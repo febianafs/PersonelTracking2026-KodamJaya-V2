@@ -432,6 +432,11 @@ class PersonelActivity : BaseActivity() {
                     BluetoothLeService.bpmValue.collect { bpm ->
                         pagerAdapter.bleBpm = bpm
                         pagerAdapter.notifyItemChanged(1)
+
+                        viewModel.updateHeartRate(
+                            bpm = bpm,
+                            deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
+                        )
                     }
                 }
             }
