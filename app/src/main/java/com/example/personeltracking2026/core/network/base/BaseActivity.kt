@@ -126,7 +126,7 @@ abstract class BaseActivity : AppCompatActivity() {
                         startToolbarBlink()
                         Toast.makeText(
                             this@BaseActivity,
-                            "⚠ SOS AKTIF — tekan F3 lagi untuk batalkan",
+                            "⚠ SOS ACTIVE — Press again to cancel",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {

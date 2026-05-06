@@ -236,7 +236,7 @@ class MqttLocationService : Service() {
             val identity = deviceManager.getIdentity()
 
             if (identity == null) {
-                Log.e("MQTT", "Serial belum di-set")
+                Log.e("MQTT", "Serial number is required")
                 return@launch
             }
 
@@ -300,7 +300,7 @@ class MqttLocationService : Service() {
                 "Personel Tracking",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Tracking lokasi personel aktif"
+                description = "Tracking Location Personel Active"
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -320,8 +320,8 @@ class MqttLocationService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Personel Tracking Aktif")
-            .setContentText("Mengirim lokasi secara berkala")
+            .setContentTitle("Personel Tracking Active")
+            .setContentText("Send Location Regulary")
             .setSmallIcon(R.drawable.ic_location_pin)
             .setOngoing(true)
             .setContentIntent(pendingIntent)

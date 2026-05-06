@@ -208,9 +208,9 @@ class BluetoothActivity : BaseActivity() {
                     showConnectedInfo(device)
                     updateDeviceList()
                 }
-                tvScanStatus.text = "Perangkat terhubung"
+                tvScanStatus.text = "Device connected"
                 tvDeviceCount.visibility = View.VISIBLE
-                tvDeviceCount.text = "${deviceList.size} perangkat ditemukan"
+                tvDeviceCount.text = "${deviceList.size} Device found"
                 // Sudah connected — tidak perlu scan ulang
                 bluetoothScanView.stopAnimation()
             }
@@ -259,7 +259,7 @@ class BluetoothActivity : BaseActivity() {
                 updateToggleUI(false)
                 Toast.makeText(
                     this,
-                    "Untuk mematikan Bluetooth, gunakan pengaturan sistem",
+                    "Please use system settings to disable Bluetooth",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -287,10 +287,10 @@ class BluetoothActivity : BaseActivity() {
 
     private fun updateToggleUI(isOn: Boolean) {
         if (isOn) {
-            tvToggleLabel.text = "Aktif"
+            tvToggleLabel.text = "Active"
             tvToggleLabel.setTextColor(ContextCompat.getColor(this, R.color.primary))
         } else {
-            tvToggleLabel.text = "Non-aktif"
+            tvToggleLabel.text = "Inactive"
             tvToggleLabel.setTextColor(ContextCompat.getColor(this, R.color.gray))
         }
     }
@@ -309,8 +309,8 @@ class BluetoothActivity : BaseActivity() {
     private fun updateBpm(bpm: Int) {
         tvBpm.text = bpm.toString()
         val (statusText, colorRes) = when {
-            bpm < 60  -> "Di Bawah Normal" to R.color.orange
-            bpm > 100 -> "Di Atas Normal"  to R.color.red
+            bpm < 60  -> "Below normal" to R.color.orange
+            bpm > 100 -> "Above normal"  to R.color.red
             else      -> "Normal"           to R.color.gray
         }
         tvHeartStatus.text = statusText
@@ -320,7 +320,7 @@ class BluetoothActivity : BaseActivity() {
     private fun updateDeviceList() {
         val count = deviceList.size
         tvDeviceCount.visibility = if (count > 0) View.VISIBLE else View.GONE
-        if (count > 0) tvDeviceCount.text = "$count perangkat ditemukan"
+        if (count > 0) tvDeviceCount.text = "$count Device found"
         adapter.renderInto(layoutDeviceList, deviceList)
     }
 
@@ -344,7 +344,7 @@ class BluetoothActivity : BaseActivity() {
         if (!hasPermission()) return
         bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
         isScanning = true
-        tvScanStatus.text = "Mencari perangkat . . ."
+        tvScanStatus.text = "Searching for devices . . ."
         bluetoothScanView.startAnimation()
 
         try {
@@ -356,7 +356,7 @@ class BluetoothActivity : BaseActivity() {
         mainHandler.postDelayed({
             if (isScanning) {
                 stopScan()
-                tvScanStatus.text = "Pencarian selesai"
+                tvScanStatus.text = "Scan completed"
                 bluetoothScanView.stopAnimation()
             }
         }, 30_000)
@@ -390,7 +390,7 @@ class BluetoothActivity : BaseActivity() {
         }
 
         override fun onScanFailed(errorCode: Int) {
-            runOnUiThread { tvScanStatus.text = "Gagal mencari perangkat ($errorCode)" }
+            runOnUiThread { tvScanStatus.text = "Failed to search for devices ($errorCode)" }
         }
     }
 
@@ -445,7 +445,7 @@ class BluetoothActivity : BaseActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
             if (results.values.all { it }) syncUIWithService()
-            else Toast.makeText(this, "Permission Bluetooth diperlukan", Toast.LENGTH_SHORT).show()
+            else Toast.makeText(this, "Bluetooth permission required", Toast.LENGTH_SHORT).show()
         }
 
     // ══════════════════════════════════════════════════════════════════════

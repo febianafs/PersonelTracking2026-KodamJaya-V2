@@ -81,14 +81,14 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onConnectionSuccess() {
         runOnUiThread {
-            Toast.makeText(this, "Stream terhubung", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Stream connected", Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onConnectionFailed(reason: String) {
         // SARAN 4: restart preview setelah koneksi gagal
         runOnUiThread {
-            Toast.makeText(this, "Koneksi gagal: $reason", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Connection failed: $reason", Toast.LENGTH_SHORT).show()
             viewModel.stopStream()
             startCameraPreview()
         }
@@ -98,7 +98,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onDisconnect() {
         runOnUiThread {
-            Toast.makeText(this, "Stream terputus", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Stream disconnected", Toast.LENGTH_SHORT).show()
             // Auto stop stream di ViewModel saat disconnect tak terduga
             if (viewModel.isLive()) viewModel.stopStream()
         }
@@ -124,8 +124,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
         when {
             cameraGranted && audioGranted -> startCameraPreview()
-            !cameraGranted -> Toast.makeText(this, "Izin kamera diperlukan", Toast.LENGTH_SHORT).show()
-            !audioGranted -> Toast.makeText(this, "Izin mikrofon diperlukan", Toast.LENGTH_SHORT).show()
+            !cameraGranted -> Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show()
+            !audioGranted -> Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -305,7 +305,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             binding.layoutIdle?.visibility = View.GONE
             binding.surfaceView?.visibility = View.VISIBLE
         } catch (e: Exception) {
-            Toast.makeText(this, "Gagal membuka kamera: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Could not open camera: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -334,7 +334,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val serial = identity.serial
         val url = StreamUtils.getRtmpUrl(serial)
         if (!hasAudioPermission()) {
-            Toast.makeText(this, "Izin mikrofon diperlukan", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
             viewModel.stopStream()
             return
         }
@@ -369,7 +369,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                     rtmpCamera.startStream(url)
                 }, 400)
             } else {
-                Toast.makeText(this, "Gagal mempersiapkan stream", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Unable to setup stream", Toast.LENGTH_SHORT).show()
                 viewModel.stopStream()
             }
         } catch (e: Exception) {
@@ -398,7 +398,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         binding.btnMic?.alpha = if (isMicEnabled) 1f else 0.5f
         Toast.makeText(
             this,
-            if (isMicEnabled) "Mikrofon aktif" else "Mikrofon mati",
+            if (isMicEnabled) "Microphone active" else "Microphone inactive",
             Toast.LENGTH_SHORT
         ).show()
     }

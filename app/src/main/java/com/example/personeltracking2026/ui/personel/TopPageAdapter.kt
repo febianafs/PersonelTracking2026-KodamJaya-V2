@@ -199,7 +199,7 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                 tvBleStatus?.text  = "Connected"
                 tvBleStatus?.setTextColor(android.graphics.Color.parseColor("#4FC3F7"))
             } else {
-                tvDeviceName?.text = "Tidak ada perangkat"
+                tvDeviceName?.text = "Device not found"
                 tvBleStatus?.text  = "Disconnected"
                 tvBleStatus?.setTextColor(android.graphics.Color.parseColor("#9E9E9E"))
             }
