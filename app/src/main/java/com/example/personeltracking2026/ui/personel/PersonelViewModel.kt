@@ -312,7 +312,13 @@ class PersonelViewModel(
         val serialNumber = identity.serial
         val androidId    = identity.androidId
 
-        val hr  = _heartRateState.value
+        val app = getApplication<Application>() as App
+        val hr  = app.currentHeartRate
+        val hrTs = app.currentHeartRateTs
+
+        val isHrExpired = System.currentTimeMillis() - hrTs > 15_000
+        val finalHr = if (isHrExpired) 0 else hr
+
         val bat = _batteryState.value
 
         val payload = MqttPayloadBuilder.buildRadioDataPayload(
@@ -323,8 +329,8 @@ class PersonelViewModel(
             lon          = location.lon,
             acc          = location.accuracy,
             gpsTimestamp = location.timestamp,
-            heartrate    = hr.bpm,
-            heartrateTs  = if (hr.timestamp > 0) hr.timestamp else System.currentTimeMillis(),
+            heartrate    = finalHr,
+            heartrateTs  = if (hrTs> 0) hrTs else System.currentTimeMillis(),
             batteryLevel = bat.percent,
             appVersion   = BuildConfig.APP_VERSION,
             rtmpUrl      = StreamUtils.getRtmpUrl(serialNumber)
@@ -337,7 +343,10 @@ class PersonelViewModel(
         RadioDataPayload::class.java.declaredFields.forEach {
             Log.d("FIELDS", it.name)
         }
-        Log.d("HR_DEBUG", "PUBLISH HR = ${hr.bpm}")
+        Log.d(
+            "HR_DEBUG",
+            "PUBLISH HR = $finalHr, expired=$isHrExpired"
+        )
     }
 
     private fun processLocation(newLoc: LocationData): LocationData? {

@@ -30,6 +30,7 @@ import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.sos.SosManager
 import com.example.personeltracking2026.ui.settings.SettingsActivity
 import com.example.personeltracking2026.utils.DeviceIdentityManager
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -183,6 +184,20 @@ class BluetoothActivity : BaseActivity() {
         lifecycleScope.launch {
             BluetoothLeService.bpmValue.collect { bpm ->
                 if (bpm > 0) updateBpm(bpm)
+
+                val app = application as App
+                app.currentHeartRate = bpm
+                app.currentHeartRateTs = System.currentTimeMillis()
+            }
+        }
+
+        lifecycleScope.launch {
+            while (true) {
+                val app = application as App
+                val isExpired = System.currentTimeMillis() - app.currentHeartRateTs > 30_000
+                val finalHr = if (isExpired) 0 else app.currentHeartRate
+                updateBpm(finalHr)
+                delay(1000)
             }
         }
     }

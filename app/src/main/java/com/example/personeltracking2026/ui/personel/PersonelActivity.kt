@@ -407,14 +407,7 @@ class PersonelActivity : BaseActivity() {
                         delay(1000)
                     }
                 }
-
                 // Heart rate dari BLE
-//                launch {
-//                    viewModel.heartRateState.collect { state ->
-//                        updateHeartRate(state.bpm)
-//                    }
-//                }
-                // Heart rate dari BLE — GANTI BLOCK INI
                 launch {
                     // Observe koneksi BLE
                     launch {
@@ -429,14 +422,31 @@ class PersonelActivity : BaseActivity() {
                     }
 
                     // Observe BPM realtime
-                    BluetoothLeService.bpmValue.collect { bpm ->
-                        pagerAdapter.bleBpm = bpm
-                        pagerAdapter.notifyItemChanged(1)
+                    launch {
+                        BluetoothLeService.bpmValue.collect { bpm ->
+                            val app = application as App
+                            // simpan HR terbaru
+                            app.currentHeartRate = bpm
+                            app.currentHeartRateTs = System.currentTimeMillis()
+                            // update ViewModel untuk MQTT
+                            viewModel.updateHeartRate(
+                                bpm = bpm,
+                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
+                            )
+                        }
+                    }
 
-                        viewModel.updateHeartRate(
-                            bpm = bpm,
-                            deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
-                        )
+                    // Refresh UI + cek expired
+                    launch {
+
+                        while (true) {
+                            val app = application as App
+                            val isExpired = System.currentTimeMillis() - app.currentHeartRateTs > 30_000
+                            val finalHr = if (isExpired) 0 else app.currentHeartRate
+                            pagerAdapter.bleBpm = finalHr
+                            pagerAdapter.notifyItemChanged(1)
+                            delay(1000)
+                        }
                     }
                 }
             }
