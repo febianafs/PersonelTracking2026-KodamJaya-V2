@@ -176,7 +176,7 @@ class SettingsActivity : BaseActivity() {
             val inputSerial = binding.etSerialNumber!!.text.toString().trim()
 
             if (inputSerial.isEmpty()) {
-                binding.etSerialNumber!!.error = "Serial number wajib diisi"
+                binding.etSerialNumber!!.error = "Serial number is required"
                 return@setOnClickListener
             }
 
@@ -195,12 +195,12 @@ class SettingsActivity : BaseActivity() {
                 // sudah ada → konfirmasi overwrite
                 AlertDialog.Builder(this)
                     .setTitle("Update Serial")
-                    .setMessage("Serial sudah ada. Mau diganti?")
-                    .setPositiveButton("Ya") { _, _ ->
+                    .setMessage("Serial number already exists. Do you want to replace it?")
+                    .setPositiveButton("Yes") { _, _ ->
                         deviceManager.forceUpdateSerial(inputSerial)
                         showSavedIndicator()
                     }
-                    .setNegativeButton("Batal", null)
+                    .setNegativeButton("No", null)
                     .show()
             }
         }
