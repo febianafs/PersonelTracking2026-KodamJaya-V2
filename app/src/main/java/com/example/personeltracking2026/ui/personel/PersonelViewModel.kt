@@ -202,8 +202,16 @@ class PersonelViewModel(
                 is Result.Success -> {
                     val data = result.data
 
-                    val safeAvatar = data.avatar_url
+                    Log.d("DETAIL_DATA", "data = $data")
+
+                    val safeName = data.full_name
+                        ?: data.name
+                        ?: sessionManager.getName()
+
+                    val safeAvatar = resolveCmsImageUrl(data.avatar_url ?: data.image)
                         ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
+
+                    sessionManager.saveName(safeName)
 
                     sessionManager.savePersonelDetail(
                         nrp       = data.nrp,
@@ -223,6 +231,16 @@ class PersonelViewModel(
                 }
                 else -> {}
             }
+        }
+    }
+
+    private fun resolveCmsImageUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+
+        return if (path.startsWith("http://") || path.startsWith("https://")) {
+            path
+        } else {
+            "https://cms.aturwalpat.com/images/${path.trimStart('/')}"
         }
     }
 

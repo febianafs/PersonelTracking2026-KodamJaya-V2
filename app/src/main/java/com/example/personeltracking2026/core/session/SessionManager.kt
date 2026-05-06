@@ -38,6 +38,12 @@ class SessionManager(context: Context) {
             .apply()
     }
 
+    fun saveName(name: String?) {
+        prefs.edit()
+            .putString(KEY_NAME, name ?: "")
+            .apply()
+    }
+
     fun saveRole(role: String) {
         prefs.edit().putString(KEY_ROLE, role).apply()
     }

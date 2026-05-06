@@ -27,6 +27,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
@@ -213,6 +214,7 @@ class PersonelActivity : BaseActivity() {
         setupVitalSignsInitial()
         updateMqttUI()
         setupClickListeners()
+        setupSwipeRefresh()
         observeAllStates()
         loadPersonelData()
         requestLocationPermission()
@@ -371,16 +373,21 @@ class PersonelActivity : BaseActivity() {
                     viewModel.personelState.collect { state ->
                         when (state) {
                             is PersonelState.Loading -> {
-                                pagerAdapter.name = "Loading..."
-                                pagerAdapter.nrp = ""
-                                pagerAdapter.rank = ""
-                                pagerAdapter.notifyItemChanged(0)
+                                binding.swipeRefresh?.isRefreshing = true
                             }
-                            is PersonelState.Success -> bindPersonelData(state.data)
+
+                            is PersonelState.Success -> {
+                                binding.swipeRefresh?.isRefreshing = false
+                                bindPersonelData(state.data)
+                            }
+
                             is PersonelState.Error -> {
+                                binding.swipeRefresh?.isRefreshing = false
+
                                 pagerAdapter.name = sessionManager.getName() ?: "-"
-                                pagerAdapter.nrp = sessionManager.getUsername() ?: "-"
-                                pagerAdapter.rank = sessionManager.getRank() ?: "-"
+                                pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
+                                pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+
                                 pagerAdapter.notifyItemChanged(0)
                             }
                         }
@@ -470,20 +477,45 @@ class PersonelActivity : BaseActivity() {
         viewModel.loadPersonelDetail(userId, token)
     }
 
+    private fun resolveCmsImageUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+
+        return if (path.startsWith("http://") || path.startsWith("https://")) {
+            path
+        } else {
+            "https://cms.aturwalpat.com/images/${path.trimStart('/')}"
+        }
+    }
+
     private fun bindPersonelData(data: PersonelData) {
-        val avatarFromApi = data.avatar_url
-        val avatarFromSession = sessionManager.getAvatar()
+        val avatarFromApi = resolveCmsImageUrl(data.avatar_url ?: data.image)
+        val avatarFromSession = sessionManager.getAvatar().takeIf { it.isNotBlank() }
+
+        val finalAvatar = avatarFromApi ?: avatarFromSession
 
         Log.d("AVATAR_CHECK", "avatarFromApi = $avatarFromApi")
         Log.d("AVATAR_CHECK", "avatarFromSession = $avatarFromSession")
-        Log.d("PROFILE_NAME_CHECK", "nameFromSession = ${sessionManager.getName()}")
+        Log.d("AVATAR_CHECK", "finalAvatar = $finalAvatar")
 
-        pagerAdapter.avatarUrl = avatarFromApi
-            ?: avatarFromSession.takeIf { it.isNotBlank() }
+        pagerAdapter.avatarUrl = finalAvatar
 
-        pagerAdapter.name = sessionManager.getName() ?: "-"
-        pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
-        pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+        finalAvatar?.let {
+            sessionManager.saveAvatar(it)
+        }
+
+        val finalName = data.full_name
+            ?: data.name
+            ?: sessionManager.getName()
+            ?: "-"
+
+        pagerAdapter.name = finalName
+        sessionManager.saveName(finalName)
+
+        pagerAdapter.nrp = data.nrp
+            ?: sessionManager.getNrp().ifBlank { "-" }
+
+        pagerAdapter.rank = data.rank?.name
+            ?: sessionManager.getRank().ifBlank { "-" }
 
         pagerAdapter.notifyItemChanged(0)
     }
@@ -497,9 +529,12 @@ class PersonelActivity : BaseActivity() {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_personel, null)
 
-        val name = sessionManager.getName() ?: "-"
-        val nrp = sessionManager.getNrp().ifBlank { "-" }
         val personel = (viewModel.personelState.value as? PersonelState.Success)?.data
+        val name = personel?.full_name
+            ?: personel?.name
+            ?: sessionManager.getName()
+            ?: "-"
+        val nrp = sessionManager.getNrp().ifBlank { "-" }
 
         view.findViewById<TextView>(R.id.tvName).text = name
         view.findViewById<TextView>(R.id.tvNRP).text = nrp
@@ -507,16 +542,21 @@ class PersonelActivity : BaseActivity() {
         view.findViewById<TextView>(R.id.tvUnit).text = personel?.unit?.name ?: "-"
         view.findViewById<TextView>(R.id.tvSquad).text = personel?.regu?.name ?: "-"
 
-        val avatarUrl = personel?.avatar_url
+        val avatarUrl = resolveCmsImageUrl(personel?.avatar_url ?: personel?.image)
             ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
 
         val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
 
-        Glide.with(this)
-            .load(avatarUrl)
-            .placeholder(R.drawable.ic_avatar)
-            .error(R.drawable.ic_avatar)
-            .into(imgProfile)
+        if (!avatarUrl.isNullOrBlank()) {
+            Glide.with(this)
+                .load(avatarUrl)
+                .placeholder(R.drawable.ic_avatar)
+                .error(R.drawable.ic_avatar)
+                .dontAnimate()
+                .into(imgProfile)
+        } else {
+            imgProfile.setImageResource(R.drawable.ic_avatar)
+        }
 
         dialog.setContentView(view)
         dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
@@ -735,6 +775,14 @@ class PersonelActivity : BaseActivity() {
             intent.putExtra("mapType", currentMapType.name)
 
             startActivity(intent)
+        }
+    }
+    // ─── SWIPE REFRESH ─────────────────────────────────────────────────────
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh?.setOnRefreshListener {
+            Log.d("SWIPE_REFRESH", "Manual refresh triggered")
+            loadPersonelData()
         }
     }
 
