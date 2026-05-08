@@ -16,6 +16,8 @@ import com.example.personeltracking2026.core.base.BaseActivity
 import com.example.personeltracking2026.core.mqtt.MqttConfig
 import com.example.personeltracking2026.core.mqtt.MqttConfigManager
 import com.example.personeltracking2026.core.mqtt.MqttManager
+import com.example.personeltracking2026.core.mqtt.MqttTopicConfig
+import com.example.personeltracking2026.core.mqtt.MqttTopicManager
 import com.example.personeltracking2026.core.utils.Constants
 import com.example.personeltracking2026.databinding.ActivitySettingsBinding
 import com.example.personeltracking2026.utils.DeviceIdentityManager
@@ -24,6 +26,10 @@ class SettingsActivity : BaseActivity() {
 
     private lateinit var binding: ActivitySettingsBinding
     private var testMqttManager: MqttManager? = null
+
+    // FIX 2: Simpan callback lama agar bisa di-restore saat Activity destroy
+    private var prevOnConnected: (() -> Unit)? = null
+    private var prevOnDisconnected: (() -> Unit)? = null
 
     private lateinit var deviceManager: DeviceIdentityManager
 
@@ -45,7 +51,7 @@ class SettingsActivity : BaseActivity() {
         setupIntervalDropdown()
         loadSettings()
         setupButtons()
-        observeMainMqttStatus()   // ← indikator realtime
+        observeMainMqttStatus()
 
         binding.radioGroupConnectionType?.setOnCheckedChangeListener { _, checkedId ->
             when (checkedId) {
@@ -61,19 +67,27 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    // FIX 2: Restore callback lama ke MqttManager utama saat Activity di-destroy
     override fun onDestroy() {
         super.onDestroy()
+        val mainMqtt = (application as? com.example.personeltracking2026.App)?.mqttManager
+        mainMqtt?.onConnected = prevOnConnected
+        mainMqtt?.onDisconnected = prevOnDisconnected
+
         testMqttManager?.disconnect()
         testMqttManager = null
     }
 
     // ─── REALTIME STATUS dari MqttManager utama ───────────────────────────
 
+    // FIX 2: Simpan callback lama sebelum di-replace, agar tidak hilang
     private fun observeMainMqttStatus() {
-        // Ambil MqttManager utama dari aplikasi (singleton/service)
-        // Sesuaikan dengan cara kamu expose MqttManager di app level
         val mainMqtt = (application as? com.example.personeltracking2026.App)?.mqttManager
             ?: return
+
+        // Simpan callback lama sebelum di-replace
+        prevOnConnected = mainMqtt.onConnected
+        prevOnDisconnected = mainMqtt.onDisconnected
 
         // Set status awal saat activity dibuka
         if (mainMqtt.isConnected()) {
@@ -162,8 +176,13 @@ class SettingsActivity : BaseActivity() {
 
         val serial = deviceManager.getValidSerial()
         binding.etSerialNumber?.setText(serial ?: "")
-
         binding.etSerialNumber?.isEnabled = true
+
+        val topicConfig = MqttTopicManager(this).load()
+        binding.etTopicPersonelData?.setText(topicConfig.personelDataTopic)
+        binding.etTopicPersonelSos?.setText(topicConfig.personelSosTopic)
+        binding.etTopicBodycamData?.setText(topicConfig.bodycamDataTopic)
+        binding.etTopicBodycamSos?.setText(topicConfig.bodycamSosTopic)
     }
 
     // ─── BUTTONS ─────────────────────────────────────────────────────────────
@@ -188,11 +207,9 @@ class SettingsActivity : BaseActivity() {
             }
 
             if (existing == null) {
-                // pertama kali simpan
                 deviceManager.saveSerialIfEmpty(inputSerial)
                 showSavedIndicator()
             } else {
-                // sudah ada → konfirmasi overwrite
                 AlertDialog.Builder(this)
                     .setTitle("Update Serial")
                     .setMessage("Serial number already exists. Do you want to replace it?")
@@ -205,18 +222,27 @@ class SettingsActivity : BaseActivity() {
             }
         }
 
-
         // ─── SAVE MQTT CONFIG ───────────────────────
         binding.btnSaveConnection.setOnClickListener {
 
             val config = buildConfigFromInput()
+
+            val topicConfig = MqttTopicConfig(
+                personelDataTopic = binding.etTopicPersonelData?.text.toString().trim(),
+                personelSosTopic  = binding.etTopicPersonelSos?.text.toString().trim(),
+                bodycamDataTopic  = binding.etTopicBodycamData?.text.toString().trim(),
+                bodycamSosTopic   = binding.etTopicBodycamSos?.text.toString().trim()
+            )
+
             MqttConfigManager(this).save(config)
+            MqttTopicManager(this).save(topicConfig)
 
             showSavedIndicator()
         }
 
-
         // ─── TEST CONNECTION ────────────────────────
+        // FIX 3: Pakai connectWithConfig() agar test pakai config dari input field,
+        // bukan config lama yang tersimpan di SharedPrefs
         binding.btnTestConnection.setOnClickListener {
 
             val config = buildConfigFromInput()
@@ -245,7 +271,8 @@ class SettingsActivity : BaseActivity() {
                 }
             }
 
-            testMqttManager?.connect()
+            // FIX 3: Gunakan connectWithConfig, bukan connect()
+            testMqttManager?.connectWithConfig(config)
         }
     }
 
