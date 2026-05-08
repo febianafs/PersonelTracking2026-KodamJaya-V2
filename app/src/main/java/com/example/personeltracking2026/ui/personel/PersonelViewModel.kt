@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.personeltracking2026.App
+import com.example.personeltracking2026.BuildConfig
 import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.data.model.LocationData
@@ -347,7 +348,7 @@ class PersonelViewModel(
             heartrate    = hr.bpm,
             heartrateTs  = if (hr.timestamp > 0) hr.timestamp else System.currentTimeMillis(),
             batteryLevel = bat.percent,
-            appVersion = "1.0.0",
+            appVersion = BuildConfig.APP_VERSION,
             rtmpUrl      = StreamUtils.getRtmpUrl(serialNumber)
         )
         // --- INPUT CSV ---
