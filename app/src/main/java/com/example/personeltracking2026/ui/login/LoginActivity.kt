@@ -77,36 +77,61 @@ class LoginActivity : AppCompatActivity() {
                             val profile = state.data.data?.profile
 
                             val avatarUrl = profile?.avatar_url ?: ""
+                            Log.d("LOGIN_PROFILE", profile.toString())
+                            Log.d("LOGIN_AVATAR_RAW", profile?.avatar_url ?: "NULL")
 
                             val nrp = profile?.nrp
                                 ?.takeIf { it.isNotBlank() }
                                 ?: state.data.data?.user?.username
                                 ?: ""
 
-                            val unit       = profile.getClassification("Unit")
-                            val battalion  = profile.getClassification("Batalyon")
-                            val squad      = profile.getClassification("Regu")
-                            val rank       = profile.getClassification("Rank")
+                            val satuan   = profile.getClassification("Satuan")
+                            val batalyon = profile.getClassification("Batalyon")
+                            val peleton  = profile.getClassification("Peleton")
+                            val regu     = profile.getClassification("Regu")
+                            val kompi    = profile.getClassification("Kompi")
+                            val divisi   = profile.getClassification("Divisi")
+                            val brigade  = profile.getClassification("Brigade")
+                            val team     = profile.getClassification("Team")
+                            val unit     = profile.getClassification("Unit")
+                            val rank     = profile.getClassification("Rank")
 
                             val sessionManager = SessionManager(this@LoginActivity)
 
                             sessionManager.saveSession(token, name)
 
                             sessionManager.savePersonelDetail(
-                                nrp       = nrp,
-                                rank      = rank,
-                                unit      = unit,
-                                battalion = battalion,
-                                squad     = squad,
-                                avatar    = avatarUrl
+                                id         = sessionManager.getUserId()?.toString() ?: "",
+                                nrp        = nrp,
+                                name       = name,
+                                satuan     = satuan,
+                                batalyon   = batalyon,
+                                peleton    = peleton,
+                                regu       = regu,
+                                kompi      = kompi,
+                                divisi     = divisi,
+                                brigade    = brigade,
+                                team       = team,
+                                unit       = unit,
+                                rank       = rank,
+                                avatarUrl  = avatarUrl
                             )
+
+                            Log.d("SESSION_AVATAR", sessionManager.getAvatarUrl())
 
                             Log.d("LOGIN_AVATAR", "avatarUrl = $avatarUrl")
                             Log.d("LOGIN_NAME", "name = $name")
+                            Log.d("SESSION_TEST", "ID        = ${sessionManager.getId()}")
                             Log.d("SESSION_TEST", "NRP       = ${sessionManager.getNrp()}")
+                            Log.d("SESSION_TEST", "SATUAN    = ${sessionManager.getSatuan()}")
+                            Log.d("SESSION_TEST", "BATALYON  = ${sessionManager.getBatalyon()}")
+                            Log.d("SESSION_TEST", "PELETON   = ${sessionManager.getPeleton()}")
+                            Log.d("SESSION_TEST", "REGU      = ${sessionManager.getRegu()}")
+                            Log.d("SESSION_TEST", "KOMPI     = ${sessionManager.getKompi()}")
+                            Log.d("SESSION_TEST", "DIVISI    = ${sessionManager.getDivisi()}")
+                            Log.d("SESSION_TEST", "BRIGADE   = ${sessionManager.getBrigade()}")
+                            Log.d("SESSION_TEST", "TEAM      = ${sessionManager.getTeam()}")
                             Log.d("SESSION_TEST", "UNIT      = ${sessionManager.getUnit()}")
-                            Log.d("SESSION_TEST", "SQUAD     = ${sessionManager.getSquad()}")
-                            Log.d("SESSION_TEST", "BATTALION = ${sessionManager.getBattalion()}")
                             Log.d("SESSION_TEST", "RANK      = ${sessionManager.getRank()}")
 
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)

@@ -51,10 +51,17 @@ object MqttPayloadBuilder {
             id        = session.getUserId()?.toString() ?: "",
             nrp       = session.getNrp() ?: "",
             name      = session.getName() ?: "",
-            satuan    = session.getS() ?: "",
-            rank      = session.getRank() ?: "",
-            unit      = session.getUnit() ?: "",
-            avatarUrl = session.getAvatar() ?: ""
+            satuan     = session.getSatuan(),
+            batalyon   = session.getBatalyon(),
+            peleton    = session.getPeleton(),
+            regu       = session.getRegu(),
+            kompi      = session.getKompi(),
+            divisi     = session.getDivisi(),
+            brigade    = session.getBrigade(),
+            team       = session.getTeam(),
+            unit       = session.getUnit(),
+            rank       = session.getRank(),
+            avatarUrl  = session.getAvatarUrl()
         )
 
         return RadioDataPayload(
@@ -107,7 +114,7 @@ object MqttPayloadBuilder {
             androidId    = androidId,
             id           = session.getUserId()?.toString() ?: "",
             name         = session.getName() ?: "",
-            avatarUrl    = session.getAvatar() ?: "",
+            avatarUrl    = session.getAvatarUrl() ?: "",
             sos          = sos,
             latitude     = lat,
             longitude    = lon,

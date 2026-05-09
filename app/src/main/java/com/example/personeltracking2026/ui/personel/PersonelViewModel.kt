@@ -211,37 +211,69 @@ class PersonelViewModel(
                         ?: sessionManager.getName()
 
                     val safeAvatar = resolveCmsImageUrl(data.avatar_url ?: data.image)
-                        ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
+                        ?: sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
 
                     sessionManager.saveName(safeName)
 
                     // ← AMBIL DARI classification ARRAY
-                    val rank  = data.getClassification("Satuan")
+                    val satuan = data.getClassification("Satuan")
+                        .ifBlank { data.satuan?.name ?: "" }
+                        .ifBlank { sessionManager.getSatuan() }
+
+                    val rank = data.getClassification("Rank")
                         .ifBlank { data.rank?.name ?: "" }
                         .ifBlank { sessionManager.getRank() }
 
-                    val unit  = data.getClassification("Unit")
+                    val unit = data.getClassification("Unit")
                         .ifBlank { data.unit?.name ?: "" }
                         .ifBlank { sessionManager.getUnit() }
 
-                    val squad = data.getClassification("Regu")
+                    val regu = data.getClassification("Regu")
                         .ifBlank { data.regu?.name ?: "" }
-                        .ifBlank { sessionManager.getSquad() }
+                        .ifBlank { sessionManager.getRegu() }
 
-                    val battalion = data.getClassification("Batalyon")
+                    val batalyon = data.getClassification("Batalyon")
                         .ifBlank { data.batalyon?.name ?: "" }
-                        .ifBlank { sessionManager.getBattalion() }
+                        .ifBlank { sessionManager.getBatalyon() }
+
+                    val peleton = data.getClassification("Peleton")
+                        .ifBlank { data.peleton?.name ?: "" }
+                        .ifBlank { sessionManager.getPeleton() }
+
+                    val kompi = data.getClassification("Kompi")
+                        .ifBlank { data.kompi?.name ?: "" }
+                        .ifBlank { sessionManager.getKompi() }
+
+                    val divisi = data.getClassification("Divisi")
+                        .ifBlank { data.divisi?.name ?: "" }
+                        .ifBlank { sessionManager.getDivisi() }
+
+                    val brigade = data.getClassification("Brigade")
+                        .ifBlank { data.brigade?.name ?: "" }
+                        .ifBlank { sessionManager.getBrigade() }
+
+                    val team = data.getClassification("Team")
+                        .ifBlank { data.team?.name ?: "" }
+                        .ifBlank { sessionManager.getTeam() }
 
                     val nrp = data.nrp?.takeIf { it.isNotBlank() }
                         ?: sessionManager.getNrp()
 
                     sessionManager.savePersonelDetail(
-                        nrp       = nrp,
-                        rank      = rank,
-                        unit      = unit,
-                        battalion = battalion,
-                        squad     = squad,
-                        avatar    = safeAvatar
+                        id         = sessionManager.getUserId()?.toString() ?: "",
+                        nrp        = nrp,
+                        name       = sessionManager.getName(),
+                        satuan     = satuan,
+                        batalyon   = batalyon,
+                        peleton    = peleton,
+                        regu       = regu,
+                        kompi      = kompi,
+                        divisi     = divisi,
+                        brigade    = brigade,
+                        team       = team,
+                        unit       = unit,
+                        rank       = rank,
+                        avatarUrl  = safeAvatar
                     )
 
                     withContext(Dispatchers.Main) {

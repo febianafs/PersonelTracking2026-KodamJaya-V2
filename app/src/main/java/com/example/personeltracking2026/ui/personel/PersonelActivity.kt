@@ -518,7 +518,7 @@ class PersonelActivity : BaseActivity() {
 
     private fun bindPersonelData(data: PersonelData) {
         val avatarFromApi = resolveCmsImageUrl(data.avatar_url ?: data.image)
-        val avatarFromSession = sessionManager.getAvatar().takeIf { it.isNotBlank() }
+        val avatarFromSession = sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
 
         val finalAvatar = avatarFromApi ?: avatarFromSession
 
@@ -579,19 +579,19 @@ class PersonelActivity : BaseActivity() {
             .ifBlank { sessionManager.getUnit() }
             .ifBlank { "-" }
 
-        val squad = personel.getClassification("Regu")
+        val regu = personel.getClassification("Regu")
             .ifBlank { personel?.regu?.name ?: "" }
-            .ifBlank { sessionManager.getSquad() }
+            .ifBlank { sessionManager.getRegu() }
             .ifBlank { "-" }
 
         view.findViewById<TextView>(R.id.tvName).text  = name
         view.findViewById<TextView>(R.id.tvNRP).text   = nrp
         view.findViewById<TextView>(R.id.tvRank).text  = rank
         view.findViewById<TextView>(R.id.tvUnit).text  = unit
-        view.findViewById<TextView>(R.id.tvSquad).text = squad
+        view.findViewById<TextView>(R.id.tvSquad).text = regu
 
         val avatarUrl = resolveCmsImageUrl(personel?.avatar_url ?: personel?.image)
-            ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
+            ?: sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
 
         val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
         if (!avatarUrl.isNullOrBlank()) {
