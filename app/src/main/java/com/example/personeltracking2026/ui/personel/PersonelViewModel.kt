@@ -19,6 +19,7 @@ import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.data.model.LocationData
 import com.example.personeltracking2026.data.model.PersonelData
 import com.example.personeltracking2026.data.model.RadioDataPayload
+import com.example.personeltracking2026.data.model.getClassification
 import com.example.personeltracking2026.data.repository.LocationRepository
 import com.example.personeltracking2026.data.repository.PersonelRepository
 import com.example.personeltracking2026.data.repository.Result
@@ -214,12 +215,32 @@ class PersonelViewModel(
 
                     sessionManager.saveName(safeName)
 
+                    // ← AMBIL DARI classification ARRAY
+                    val rank  = data.getClassification("Satuan")
+                        .ifBlank { data.rank?.name ?: "" }
+                        .ifBlank { sessionManager.getRank() }
+
+                    val unit  = data.getClassification("Unit")
+                        .ifBlank { data.unit?.name ?: "" }
+                        .ifBlank { sessionManager.getUnit() }
+
+                    val squad = data.getClassification("Regu")
+                        .ifBlank { data.regu?.name ?: "" }
+                        .ifBlank { sessionManager.getSquad() }
+
+                    val battalion = data.getClassification("Batalyon")
+                        .ifBlank { data.batalyon?.name ?: "" }
+                        .ifBlank { sessionManager.getBattalion() }
+
+                    val nrp = data.nrp?.takeIf { it.isNotBlank() }
+                        ?: sessionManager.getNrp()
+
                     sessionManager.savePersonelDetail(
-                        nrp       = data.nrp,
-                        rank      = data.rank?.name,
-                        unit      = data.unit?.name,
-                        battalion = data.batalyon?.name,
-                        squad     = data.regu?.name,
+                        nrp       = nrp,
+                        rank      = rank,
+                        unit      = unit,
+                        battalion = battalion,
+                        squad     = squad,
                         avatar    = safeAvatar
                     )
 

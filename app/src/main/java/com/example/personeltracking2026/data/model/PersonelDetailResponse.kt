@@ -15,6 +15,7 @@ data class PersonelData(
     val email: String?,
     val avatar_url: String?,
     val image: String?,
+    val classification: List<ClassificationItem>?,
     val satuan: UnitItem?,
     val batalyon: UnitItem?,
     val pleton: UnitItem?,
@@ -33,3 +34,11 @@ data class UnitItem(
     val id: Int? = null,
     val name: String?
 )
+
+// Helper extension — sama seperti di LoginResponse
+fun PersonelData?.getClassification(label: String): String {
+    return this?.classification
+        ?.firstOrNull { it.label.equals(label, ignoreCase = true) }
+        ?.value
+        ?: ""
+}

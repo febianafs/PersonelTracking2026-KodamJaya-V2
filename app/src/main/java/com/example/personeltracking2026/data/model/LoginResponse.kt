@@ -18,16 +18,14 @@ data class LoginData(
 data class ProfileData(
     val id: Int?,
     val user_id: Int?,
+    val nrp: String?,
     val full_name: String?,
     val phone_number: String?,
     val date_of_birth: String?,
     val avatar_url: String?,
     val created_at: String?,
     val updated_at: String?,
-    val satuan: SimpleNameData?,
-    val batalyon: SimpleNameData?,
-    val rank: SimpleNameData?,
-    val regu: SimpleNameData?
+    val classification: List<ClassificationItem>?
 )
 
 data class ClientData(
@@ -57,3 +55,18 @@ data class SimpleNameData(
     val id: Int? = null,
     val name: String?
 )
+
+data class ClassificationItem(
+    val label: String?,
+    val value: String?
+)
+
+fun ProfileData?.getClassification(label: String): String {
+
+    return this?.classification
+        ?.firstOrNull {
+            it.label.equals(label, ignoreCase = true)
+        }
+        ?.value
+        ?: ""
+}

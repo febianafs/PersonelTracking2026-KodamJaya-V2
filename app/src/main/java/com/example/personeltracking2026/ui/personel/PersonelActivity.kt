@@ -40,6 +40,7 @@ import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.sos.SosManager
 import com.example.personeltracking2026.data.model.LocationData
 import com.example.personeltracking2026.data.model.PersonelData
+import com.example.personeltracking2026.data.model.getClassification
 import com.example.personeltracking2026.data.repository.LocationRepository
 import com.example.personeltracking2026.data.repository.PersonelRepository
 import com.example.personeltracking2026.databinding.ActivityPersonelBinding
@@ -529,23 +530,41 @@ class PersonelActivity : BaseActivity() {
         val view = layoutInflater.inflate(R.layout.bottom_sheet_personel, null)
 
         val personel = (viewModel.personelState.value as? PersonelState.Success)?.data
+
         val name = personel?.full_name
             ?: personel?.name
             ?: sessionManager.getName()
             ?: "-"
-        val nrp = sessionManager.getNrp().ifBlank { "-" }
 
-        view.findViewById<TextView>(R.id.tvName).text = name
-        view.findViewById<TextView>(R.id.tvNRP).text = nrp
-        view.findViewById<TextView>(R.id.tvRank).text = personel?.rank?.name ?: "-"
-        view.findViewById<TextView>(R.id.tvUnit).text = personel?.unit?.name ?: "-"
-        view.findViewById<TextView>(R.id.tvSquad).text = personel?.regu?.name ?: "-"
+        val nrp = personel?.nrp?.takeIf { it.isNotBlank() }
+            ?: sessionManager.getNrp().ifBlank { "-" }
+
+        // Ambil dari classification dulu, fallback ke field langsung, fallback ke session
+        val rank = personel.getClassification("Satuan")
+            .ifBlank { personel?.rank?.name ?: "" }
+            .ifBlank { sessionManager.getRank() }
+            .ifBlank { "-" }
+
+        val unit = personel.getClassification("Unit")
+            .ifBlank { personel?.unit?.name ?: "" }
+            .ifBlank { sessionManager.getUnit() }
+            .ifBlank { "-" }
+
+        val squad = personel.getClassification("Regu")
+            .ifBlank { personel?.regu?.name ?: "" }
+            .ifBlank { sessionManager.getSquad() }
+            .ifBlank { "-" }
+
+        view.findViewById<TextView>(R.id.tvName).text  = name
+        view.findViewById<TextView>(R.id.tvNRP).text   = nrp
+        view.findViewById<TextView>(R.id.tvRank).text  = rank
+        view.findViewById<TextView>(R.id.tvUnit).text  = unit
+        view.findViewById<TextView>(R.id.tvSquad).text = squad
 
         val avatarUrl = resolveCmsImageUrl(personel?.avatar_url ?: personel?.image)
             ?: sessionManager.getAvatar().takeIf { it.isNotBlank() }
 
         val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
-
         if (!avatarUrl.isNullOrBlank()) {
             Glide.with(this)
                 .load(avatarUrl)
