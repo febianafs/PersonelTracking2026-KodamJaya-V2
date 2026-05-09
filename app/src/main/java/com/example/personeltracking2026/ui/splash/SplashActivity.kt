@@ -23,6 +23,7 @@ import com.example.personeltracking2026.ui.personel.PersonelActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.provider.Settings
+import com.example.personeltracking2026.core.navigation.LastScreen
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {
@@ -74,17 +75,16 @@ class SplashActivity : AppCompatActivity() {
 
         return when (val result = authRepository.checkToken(token)) {
             is Result.Success -> {
-                when (sessionManager.getRole()) {
-                    SessionManager.ROLE_PERSONEL -> PersonelActivity::class.java
-                    SessionManager.ROLE_BODYCAM  -> BodycamActivity::class.java
-                    else                         -> MainActivity::class.java
-                }
-            }
-            is Result.Error -> {
-                if (result.message == "Token expired") {
-                    sessionManager.clearSession()
-                    LoginActivity::class.java
+
+                val lastScreen = sessionManager.getLastScreen()
+
+                if (lastScreen != null) {
+                    when (lastScreen) {
+                        LastScreen.PERSONEL -> PersonelActivity::class.java
+                        LastScreen.BODYCAM  -> BodycamActivity::class.java
+                    }
                 } else {
+                    // fallback kalau belum ada last screen
                     when (sessionManager.getRole()) {
                         SessionManager.ROLE_PERSONEL -> PersonelActivity::class.java
                         SessionManager.ROLE_BODYCAM  -> BodycamActivity::class.java

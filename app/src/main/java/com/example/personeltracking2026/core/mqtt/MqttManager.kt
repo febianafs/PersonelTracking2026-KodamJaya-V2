@@ -9,7 +9,6 @@ import com.example.personeltracking2026.data.model.BodycamDataPayload
 import com.example.personeltracking2026.data.model.BodycamSosPayload
 import com.example.personeltracking2026.data.model.RadioDataPayload
 import com.example.personeltracking2026.data.model.RadioSosPayload
-import com.google.gson.Gson
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3AsyncClient
 import com.hivemq.client.mqtt.mqtt3.Mqtt3Client
@@ -33,10 +32,6 @@ class MqttManager(private val context: Context) {
 
     companion object {
         private const val TAG            = "MqttManager"
-        const val TOPIC_RADIO_DATA       = "tjw/radio/data"
-        const val TOPIC_BODYCAM_DATA     = "tjw/bodycam/data"
-        const val TOPIC_RADIO_SOS        = "tjw/radio/sos"
-        const val TOPIC_BODYCAM_SOS      = "tjw/bodycam/sos"
         const val QOS_DATA               = 1
         const val QOS_SOS                = 2
         private const val MAX_RETRY      = 5
@@ -48,15 +43,15 @@ class MqttManager(private val context: Context) {
     var onPublishSuccess : ((topic: String) -> Unit)?                   = null
     var onPublishFailed  : ((topic: String, reason: String) -> Unit)?   = null
 
-    //private val gson  = Gson()
     private val scope = CoroutineScope(Dispatchers.IO)
+
+    // FIX 1: Baca topic dari MqttTopicManager, bukan konstanta hardcoded
+    private fun topics() = MqttTopicManager(context).load()
 
     private var client             : Mqtt3AsyncClient? = null
     private var retryJob           : Job?              = null
     private var retryCount                             = 0
     private var isIntentionallyStopped                 = false
-
-    private var reconnectAttempts = 0
 
     // ─── PUBLIC ──────────────────────────────────────────────────────────────
 
@@ -64,6 +59,13 @@ class MqttManager(private val context: Context) {
         isIntentionallyStopped = false
         retryCount = 0
         scope.launch { doConnect() }
+    }
+
+    // FIX 3: Fungsi baru untuk test connection pakai config dari luar (input field)
+    fun connectWithConfig(config: MqttConfig) {
+        isIntentionallyStopped = false
+        retryCount = 0
+        scope.launch { doConnectWithConfig(config) }
     }
 
     fun disconnect() {
@@ -96,56 +98,47 @@ class MqttManager(private val context: Context) {
     }
 
     fun publishDirect(topic: String, payload: String) {
-
         client?.publishWith()
             ?.topic(topic)
             ?.payload(payload.toByteArray())
             ?.send()
-
         MqttLogger.publish(topic, payload)
     }
 
     fun isConnected(): Boolean = client?.state?.isConnected == true
 
+    // FIX 1: Semua fungsi publish sekarang baca topic dari MqttTopicManager
     fun publishRadioData(payload: RadioDataPayload) {
         scope.launch {
             val json = buildRadioDataJson(payload)
-            publish(TOPIC_RADIO_DATA, json, QOS_DATA)
+            publish(topics().personelDataTopic, json, QOS_DATA)
         }
     }
 
     fun publishRadioSos(payload: RadioSosPayload) {
         scope.launch {
             val json = buildRadioSosJson(payload)
-            publish(TOPIC_RADIO_SOS, json, QOS_SOS)
+            publish(topics().personelSosTopic, json, QOS_SOS)
         }
     }
 
     fun publishBodycamData(payload: BodycamDataPayload) {
         scope.launch {
             val json = buildBodycamDataJson(payload)
-            publish(TOPIC_BODYCAM_DATA, json, QOS_DATA)
-        }
-    }
-    fun publishBodycamSos(payload: BodycamSosPayload) {
-        scope.launch {
-            val json = buildBodycamSosJson(payload)
-            publish(TOPIC_BODYCAM_SOS, json, QOS_SOS)
+            publish(topics().bodycamDataTopic, json, QOS_DATA)
         }
     }
 
-//    fun publishData(payload: RadioDataPayload) {
-//        scope.launch { publish(TOPIC_DATA, gson.toJson(payload), QOS_DATA) }
-//    }
-//
-//    fun publishSos(payload: RadioSosPayload) {
-//        scope.launch { publish(TOPIC_SOS, gson.toJson(payload), QOS_SOS) }
-//    }
+    fun publishBodycamSos(payload: BodycamSosPayload) {
+        scope.launch {
+            val json = buildBodycamSosJson(payload)
+            publish(topics().bodycamSosTopic, json, QOS_SOS)
+        }
+    }
 
     // ─── INTERNAL ────────────────────────────────────────────────────────────
 
     private fun doConnect() {
-        // Selalu baca config terbaru dari MqttConfigManager — bukan dari prefs langsung
         val config = MqttConfigManager(context).load()
         val host   = config.host
         val port   = if (config.useWebSocket) config.wsPort else config.tcpPort
@@ -161,21 +154,17 @@ class MqttManager(private val context: Context) {
             .serverHost(host)
             .serverPort(port)
 
-        // WebSocket hanya kalau dipakai
         if (config.useWebSocket) {
             builder.webSocketConfig()
                 .serverPath("/")
                 .applyWebSocketConfig()
         }
 
-        // Authentication
         builder.simpleAuth()
             .username(user)
             .password(pass.toByteArray(StandardCharsets.UTF_8))
             .applySimpleAuth()
 
-        // Build client tanpa disconnectedListener
-        // Reconnect dihandle oleh MqttReconnectManager
         client = builder.buildAsync()
 
         client?.connect()
@@ -183,8 +172,6 @@ class MqttManager(private val context: Context) {
                 if (throwable != null) {
                     MqttLogger.error("Connect failed: ${throwable.message}")
                     onDisconnected?.invoke()
-
-                    //jika gagal, coba lagi setelah delay dengan exponential backoff
                     if (!isIntentionallyStopped) scheduleRetry()
                     return@whenComplete
                 }
@@ -193,28 +180,66 @@ class MqttManager(private val context: Context) {
                     MqttLogger.connect("$protocol://$host:$port", retryCount > 0)
                     retryCount = 0
                     onConnected?.invoke()
-
-                    //Flush queue setelah koneksi berhasil
                     scope.launch {
                         queueManager.flush(this@MqttManager)
                     }
                 } else {
                     MqttLogger.error("Connect rejected: ${connAck?.returnCode}")
                     onDisconnected?.invoke()
-
-                    //jika ditolak, coba lagi setelah delay dengan exponential backoff
                     if (!isIntentionallyStopped) scheduleRetry()
                 }
             }
     }
 
+    // FIX 3: doConnectWithConfig — terima config dari parameter, bukan dari SharedPrefs
+    // Dipakai khusus untuk Test Connection di SettingsActivity
+    private fun doConnectWithConfig(config: MqttConfig) {
+        val host = config.host
+        val port = if (config.useWebSocket) config.wsPort else config.tcpPort
+        val user = config.username
+        val pass = config.password
+
+        val clientId = "android_test_${System.currentTimeMillis()}".take(23)
+
+        val builder = Mqtt3Client.builder()
+            .identifier(clientId)
+            .serverHost(host)
+            .serverPort(port)
+
+        if (config.useWebSocket) {
+            builder.webSocketConfig()
+                .serverPath("/")
+                .applyWebSocketConfig()
+        }
+
+        builder.simpleAuth()
+            .username(user)
+            .password(pass.toByteArray(StandardCharsets.UTF_8))
+            .applySimpleAuth()
+
+        client = builder.buildAsync()
+
+        client?.connect()?.whenComplete { connAck, throwable ->
+            if (throwable != null) {
+                MqttLogger.error("Test connect failed: ${throwable.message}")
+                onDisconnected?.invoke()
+                return@whenComplete
+            }
+            if (connAck?.returnCode == Mqtt3ConnAckReturnCode.SUCCESS) {
+                MqttLogger.connect("test://$host:$port", false)
+                onConnected?.invoke()
+            } else {
+                MqttLogger.error("Test connect rejected: ${connAck?.returnCode}")
+                onDisconnected?.invoke()
+            }
+        }
+    }
+
     private fun publish(topic: String, json: String, qos: Int) {
         if (!isConnected()) {
-
             scope.launch {
                 queueManager.save(topic, json)
             }
-
             Log.d("MQTT_QUEUE", "Saved to queue DB")
             onPublishFailed?.invoke(topic, "Queued (offline)")
             return
@@ -246,7 +271,8 @@ class MqttManager(private val context: Context) {
         retryJob?.cancel()
         retryJob = scope.launch {
             retryCount++
-            val delayMs = RETRY_DELAY_MS * retryCount
+            // FIX 4: Tambah cap 30 detik agar tidak menunggu terlalu lama
+            val delayMs = minOf(RETRY_DELAY_MS * retryCount, 30_000L)
             Log.i(TAG, "Retry #$retryCount in ${delayMs / 1000}s...")
             delay(delayMs)
             if (!isIntentionallyStopped) doConnect()
@@ -255,12 +281,10 @@ class MqttManager(private val context: Context) {
 
     private fun buildRadioDataJson(p: RadioDataPayload): String {
         return JSONObject().apply {
-
             put("timestamp", p.timestamp)
             put("serial_number", p.serialNumber)
             put("android_id", p.androidId)
             put("app_version", p.appVersion)
-
             put("identity", JSONObject().apply {
                 put("id", p.identity.id)
                 put("nrp", p.identity.nrp)
@@ -277,28 +301,23 @@ class MqttManager(private val context: Context) {
                 put("unit", p.identity.unit)
                 put("avatar_url", p.identity.avatarUrl)
             })
-
             put("gps", JSONObject().apply {
                 put("gps_timestamp", p.gps.gpsTimestamp)
                 put("latitude", p.gps.latitude)
                 put("longitude", p.gps.longitude)
-                put("accuracy",p.gps.accuracy)
+                put("accuracy", p.gps.accuracy)
             })
-
             put("radio_health", JSONObject().apply {
                 put("heartrate_timestamp", p.radioHealth.heartrateTimestamp)
                 put("heartrate", p.radioHealth.heartrate)
             })
-
             put("battery", JSONObject().apply {
                 put("battery_timestamp", p.battery.batteryTimestamp)
                 put("level", p.battery.level)
             })
-
             put("stream", JSONObject().apply {
                 put("rtmp_url", p.stream.rtmpUrl)
             })
-
         }.toString()
     }
 
@@ -313,7 +332,7 @@ class MqttManager(private val context: Context) {
             put("sos", p.sos)
             put("latitude", p.latitude)
             put("longitude", p.longitude)
-            put("accuracy",p.accuracy)
+            put("accuracy", p.accuracy)
         }.toString()
     }
 

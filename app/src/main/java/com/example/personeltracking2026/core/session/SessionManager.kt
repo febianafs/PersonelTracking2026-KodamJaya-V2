@@ -25,6 +25,8 @@ class SessionManager(context: Context) {
 
         const val ROLE_PERSONEL = "personel"
         const val ROLE_BODYCAM  = "bodycam"
+
+        private const val KEY_LAST_SCREEN = "last_screen"
     }
 
     // ─── AUTH ────────────────────────────────────────────────────────────────
@@ -36,6 +38,12 @@ class SessionManager(context: Context) {
             .apply()
     }
 
+    fun saveName(name: String?) {
+        prefs.edit()
+            .putString(KEY_NAME, name ?: "")
+            .apply()
+    }
+
     fun saveRole(role: String) {
         prefs.edit().putString(KEY_ROLE, role).apply()
     }
@@ -44,9 +52,32 @@ class SessionManager(context: Context) {
         prefs.edit().putString(KEY_NRP, nrp).apply()
     }
 
+    fun saveAvatar(avatar: String?) {
+        prefs.edit()
+            .putString(KEY_AVATAR, avatar ?: "")
+            .apply()
+    }
+
     fun getToken()   : String? = prefs.getString(KEY_TOKEN, null)
     fun getName()    : String? = prefs.getString(KEY_NAME, null)
     fun getRole()    : String? = prefs.getString(KEY_ROLE, null)
+
+    fun saveLastScreen(screen: com.example.personeltracking2026.core.navigation.LastScreen) {
+        prefs.edit()
+            .putString(KEY_LAST_SCREEN, screen.name)
+            .apply()
+    }
+
+    fun getLastScreen(): com.example.personeltracking2026.core.navigation.LastScreen? {
+        val value = prefs.getString(KEY_LAST_SCREEN, null)
+        return try {
+            value?.let {
+                com.example.personeltracking2026.core.navigation.LastScreen.valueOf(it)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
     fun isLoggedIn() : Boolean = getToken() != null
 
     fun getUserId(): Int? {

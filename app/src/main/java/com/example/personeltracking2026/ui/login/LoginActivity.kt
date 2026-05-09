@@ -2,6 +2,7 @@ package com.example.personeltracking2026.ui.login
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.activity.viewModels
@@ -14,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.session.SessionManager
+import com.example.personeltracking2026.data.model.getClassification
 import com.example.personeltracking2026.data.repository.LoginRepository
 import com.example.personeltracking2026.data.repository.Result
 import com.example.personeltracking2026.databinding.ActivityLoginBinding
@@ -67,8 +69,45 @@ class LoginActivity : AppCompatActivity() {
                             binding.btnLogin.isEnabled = true
 
                             val token = state.data.data?.token ?: ""
-                            val name = state.data.data?.user?.name ?: ""
-                            SessionManager(this@LoginActivity).saveSession(token, name)
+
+                            val name = state.data.data?.profile?.full_name
+                                ?: state.data.data?.user?.name
+                                ?: ""
+
+                            val profile = state.data.data?.profile
+
+                            val avatarUrl = profile?.avatar_url ?: ""
+
+                            val nrp = profile?.nrp
+                                ?.takeIf { it.isNotBlank() }
+                                ?: state.data.data?.user?.username
+                                ?: ""
+
+                            val unit       = profile.getClassification("Unit")
+                            val battalion  = profile.getClassification("Batalyon")
+                            val squad      = profile.getClassification("Regu")
+                            val rank       = profile.getClassification("Rank")
+
+                            val sessionManager = SessionManager(this@LoginActivity)
+
+                            sessionManager.saveSession(token, name)
+
+                            sessionManager.savePersonelDetail(
+                                nrp       = nrp,
+                                rank      = rank,
+                                unit      = unit,
+                                battalion = battalion,
+                                squad     = squad,
+                                avatar    = avatarUrl
+                            )
+
+                            Log.d("LOGIN_AVATAR", "avatarUrl = $avatarUrl")
+                            Log.d("LOGIN_NAME", "name = $name")
+                            Log.d("SESSION_TEST", "NRP       = ${sessionManager.getNrp()}")
+                            Log.d("SESSION_TEST", "UNIT      = ${sessionManager.getUnit()}")
+                            Log.d("SESSION_TEST", "SQUAD     = ${sessionManager.getSquad()}")
+                            Log.d("SESSION_TEST", "BATTALION = ${sessionManager.getBattalion()}")
+                            Log.d("SESSION_TEST", "RANK      = ${sessionManager.getRank()}")
 
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)
                             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

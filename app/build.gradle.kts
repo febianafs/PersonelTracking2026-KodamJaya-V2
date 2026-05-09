@@ -109,6 +109,10 @@ dependencies {
     //circleindicator
     implementation("me.relex:circleindicator:2.1.6")
 
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // TEST
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

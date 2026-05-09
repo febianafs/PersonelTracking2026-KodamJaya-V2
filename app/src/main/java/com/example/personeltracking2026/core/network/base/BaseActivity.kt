@@ -47,17 +47,13 @@ abstract class BaseActivity : AppCompatActivity() {
     // ─── SOS ─────────────────────────────────────────────────────────────────
     private var sosBlinkJob: Job? = null
 
-    /**
-     * Override di Activity yang punya toolbar dengan ID berbeda,
-     * atau biarkan null kalau Activity tidak punya toolbar (Login, Main).
-     * Default: cari toolbar dengan ID R.id.toolbar.
-     */
+    // FIX: Flag untuk mencegah Toast muncul berulang saat Activity baru dibuka
+    // dengan SOS yang sudah aktif sebelumnya
+    private var wasAlreadyActiveOnStart = false
+
     open fun getSosToolbar(): androidx.appcompat.widget.Toolbar? =
         findViewById(R.id.toolbar)
 
-    /**
-     * Set true di LoginActivity dan MainActivity agar SOS tidak aktif di sana.
-     */
     open val isSosEnabled: Boolean get() = true
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
@@ -92,6 +88,17 @@ abstract class BaseActivity : AppCompatActivity() {
         if (!isInternetAvailable()) {
             showNoInternetBanner()
         }
+
+        // FIX: Saat Activity resume (termasuk saat baru dibuka dari stack),
+        // langsung apply visual SOS state agar toolbar langsung blink
+        // tanpa menunggu StateFlow emit perubahan
+        if (isSosEnabled) {
+            if (SosManager.isActive.value) {
+                startToolbarBlink()
+            } else {
+                stopToolbarBlink()
+            }
+        }
     }
 
     override fun onPause() {
@@ -118,18 +125,40 @@ abstract class BaseActivity : AppCompatActivity() {
 
     // ─── SOS OBSERVER ────────────────────────────────────────────────────────
 
+    // FIX: observeSosState sekarang pakai flag wasAlreadyActiveOnStart
+    // untuk membedakan antara:
+    // (a) SOS baru diaktifkan → tampilkan Toast
+    // (b) SOS sudah aktif sebelum Activity ini dibuka → jangan tampilkan Toast lagi
     private fun observeSosState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+
+                // Catat apakah SOS sudah aktif sejak awal STARTED
+                wasAlreadyActiveOnStart = SosManager.isActive.value
+
                 SosManager.isActive.collect { isActive ->
                     if (isActive) {
+                        // FIX: Delay kecil agar toolbar sudah fully inflated
+                        // sebelum blink dimulai (penting saat Activity baru dibuka)
+                        delay(150)
+
                         startToolbarBlink()
-                        Toast.makeText(
-                            this@BaseActivity,
-                            "⚠ SOS AKTIF — tekan F3 lagi untuk batalkan",
-                            Toast.LENGTH_LONG
-                        ).show()
+
+                        // Hanya tampilkan Toast kalau SOS baru diaktifkan,
+                        // bukan karena Activity baru dibuka dengan SOS sudah aktif
+                        if (!wasAlreadyActiveOnStart) {
+                            Toast.makeText(
+                                this@BaseActivity,
+                                "⚠ SOS ACTIVE — Press again to cancel",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+
+                        // Reset flag setelah emit pertama
+                        wasAlreadyActiveOnStart = false
+
                     } else {
+                        wasAlreadyActiveOnStart = false
                         stopToolbarBlink()
                     }
                 }
@@ -189,7 +218,10 @@ abstract class BaseActivity : AppCompatActivity() {
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.action_bodycam -> {
-                    startActivity(Intent(this, BodycamActivity::class.java))
+                    val intent = Intent(this, BodycamActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    startActivity(intent)
+                    finish()
                     true
                 }
                 R.id.action_setting -> {
@@ -248,7 +280,7 @@ abstract class BaseActivity : AppCompatActivity() {
 
     private fun logout() {
         sessionManager.clearSession()
-        SosManager.deactivate() // Matikan SOS saat logout
+        SosManager.deactivate()
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

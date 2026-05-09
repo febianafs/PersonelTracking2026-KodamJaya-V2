@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.personeltracking2026.BuildConfig
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
 import com.example.personeltracking2026.data.repository.AboutRepository
@@ -58,7 +59,7 @@ class AboutActivity : BaseActivity() {
             binding.cardBranding,
             binding.cardInfo,
             binding.cardLegal,
-            binding.btnPrivacyPolicy
+//            binding.btnPrivacyPolicy
         )
 
         views.forEachIndexed { index, view ->
@@ -90,18 +91,19 @@ class AboutActivity : BaseActivity() {
                             binding.tvDev.text = data?.dev ?: "RTI Dev"
                             binding.tvCompany.text = data?.company_name ?: "PT.DHARMAPALA AGUNG SEJAHTERA"
                             binding.tvCopyright.text = data?.copyright_text ?: "©2026"
+                            binding.tvAppVersion.text = BuildConfig.APP_VERSION
                             binding.tvLegalNotice.text = data?.legal_notice ?: "All rights reserved"
 
                             val privacyUrl = data?.privacy_policy_url
-                            if (!privacyUrl.isNullOrEmpty()) {
-                                binding.btnPrivacyPolicy.setOnClickListener {
-                                    startActivity(
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl))
-                                    )
-                                }
-                            } else {
-                                binding.btnPrivacyPolicy.visibility = View.GONE
-                            }
+//                            if (!privacyUrl.isNullOrEmpty()) {
+//                                binding.btnPrivacyPolicy.setOnClickListener {
+//                                    startActivity(
+//                                        Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl))
+//                                    )
+//                                }
+//                            } else {
+//                                binding.btnPrivacyPolicy.visibility = View.GONE
+//                            }
 
                             // Jalankan animasi setelah data masuk
                             playStaggeredAnimation()

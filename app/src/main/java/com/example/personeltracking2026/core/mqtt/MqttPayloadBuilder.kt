@@ -51,6 +51,7 @@ object MqttPayloadBuilder {
             id        = session.getUserId()?.toString() ?: "",
             nrp       = session.getNrp() ?: "",
             name      = session.getName() ?: "",
+            satuan    = session.getS() ?: "",
             rank      = session.getRank() ?: "",
             unit      = session.getUnit() ?: "",
             avatarUrl = session.getAvatar() ?: ""

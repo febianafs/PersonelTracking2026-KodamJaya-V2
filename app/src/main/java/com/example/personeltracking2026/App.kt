@@ -21,5 +21,20 @@ class App : Application() {
         mqttManager = MqttManager(this).apply {
             connect()
         }
+
+        // TAMBAH INI — init SosManager di level App
+        // Sehingga SOS bisa diaktifkan dari Activity manapun (termasuk Settings)
+        val session       = com.example.personeltracking2026.core.session.SessionManager(this)
+        val deviceManager = com.example.personeltracking2026.utils.DeviceIdentityManager(this)
+        val identity      = deviceManager.getIdentity()
+
+        com.example.personeltracking2026.core.sos.SosManager.init(
+            mqtt             = mqttManager,
+            session          = session,
+            serial           = identity.serial,
+            id               = identity.androidId,
+            type             = com.example.personeltracking2026.core.sos.SosManager.DeviceType.RADIO,
+            locationProvider = { Triple(currentLat, currentLon, currentAccuracy) }
+        )
     }
 }

@@ -32,7 +32,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Kembali"
+                android:contentDescription="Back"
                 android:scaleType="centerInside"
                 android:src="@drawable/ic_arrow_back"
                 app:tint="@color/white" />
@@ -48,7 +48,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:text="Bluetooth Setting"
+                android:text="Bluetooth Settings"
                 android:textColor="@color/primary"
                 android:textSize="14sp"
                 android:textStyle="bold" />
@@ -120,7 +120,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="10dp"
-                        android:text="Non-aktif"
+                        android:text="Inactive"
                         android:textColor="@color/gray"
                         android:textSize="13sp" />
 
@@ -207,7 +207,7 @@
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_horizontal"
                             android:layout_marginBottom="4dp"
-                            android:text="Mencari perangkat . . ."
+                            android:text="Looking for devices . . ."
                             android:textColor="@color/gray"
                             android:textSize="13sp" />
 
@@ -295,7 +295,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="center_horizontal"
-                            android:text="detak jantung / menit"
+                            android:text="Heart Rate (BPM)"
                             android:textColor="@color/gray"
                             android:textSize="12sp" />
 

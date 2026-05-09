@@ -247,6 +247,36 @@
 
                     </LinearLayout>
 
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:background="@color/background2" />
+
+                    <!-- ROW: App Version -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingVertical="8dp">
+
+                        <TextView
+                            android:layout_width="120dp"
+                            android:layout_height="wrap_content"
+                            android:text="App Version"
+                            android:textColor="@color/gray"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/tvAppVersion"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="-"
+                            android:textColor="@color/white"
+                            android:textSize="13sp" />
+
+                    </LinearLayout>
+
                 </LinearLayout>
 
             </androidx.cardview.widget.CardView>
@@ -290,13 +320,13 @@
             </androidx.cardview.widget.CardView>
 
             <!-- BUTTON PRIVACY POLICY -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPrivacyPolicy"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Privacy Policy →"
-                android:textStyle="bold"
-                style="@style/Widget.App.PrimaryButton" />
+<!--            <com.google.android.material.button.MaterialButton-->
+<!--                android:id="@+id/btnPrivacyPolicy"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="48dp"-->
+<!--                android:text="Privacy Policy →"-->
+<!--                android:textStyle="bold"-->
+<!--                style="@style/Widget.App.PrimaryButton" />-->
 
         </LinearLayout>
 

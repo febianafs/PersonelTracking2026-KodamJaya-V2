@@ -86,7 +86,7 @@
                 android:background="@drawable/bg_btn_connect"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="5dp"
-                android:text="Hubungkan"
+                android:text="Connect"
                 android:textColor="@color/primary"
                 android:textSize="11sp"
                 android:visibility="gone" />
@@ -99,7 +99,7 @@
                 android:background="@drawable/bg_btn_connecting"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="5dp"
-                android:text="Menghubungkan..."
+                android:text="Connecting..."
                 android:textColor="@color/orange"
                 android:textSize="11sp"
                 android:visibility="gone" />
@@ -113,7 +113,7 @@
                 android:background="@drawable/bg_badge_connected"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="5dp"
-                android:text="Terhubung"
+                android:text="Connected"
                 android:textColor="@color/primary"
                 android:textSize="11sp"
                 android:visibility="gone" />
@@ -126,7 +126,7 @@
                 android:background="@drawable/bg_btn_disconnect"
                 android:paddingHorizontal="10dp"
                 android:paddingVertical="5dp"
-                android:text="Lepaskan"
+                android:text="Disconnect"
                 android:textColor="@color/red"
                 android:textSize="11sp"
                 android:visibility="gone" />

@@ -9,23 +9,36 @@ data class PersonelDetailResponse(
 
 data class PersonelData(
     val id: Int,
+    val name: String?,
+    val full_name: String?,
     val nrp: String?,
     val email: String?,
+    val avatar_url: String?,
     val image: String?,
+    val classification: List<ClassificationItem>?,
+    val satuan: UnitItem?,
     val batalyon: UnitItem?,
-    val brigade: UnitItem?,
-    val client: UnitItem?,
-    val divisi: UnitItem?,
-    val kompi: UnitItem?,
+    val pleton: UnitItem?,
     val peleton: UnitItem?,
+    val kompi: UnitItem?,
+    val brigade: UnitItem?,
+    val divisi: UnitItem?,
+    val team: UnitItem?,
+    val unit: UnitItem?,
     val rank: UnitItem?,
     val regu: UnitItem?,
-    val satuan: UnitItem?,
-    val team: UnitItem?,
-    val unit: UnitItem?
+    val client: UnitItem?
 )
 
 data class UnitItem(
-    val id: Int,
+    val id: Int? = null,
     val name: String?
 )
+
+// Helper extension — sama seperti di LoginResponse
+fun PersonelData?.getClassification(label: String): String {
+    return this?.classification
+        ?.firstOrNull { it.label.equals(label, ignoreCase = true) }
+        ?.value
+        ?: ""
+}
