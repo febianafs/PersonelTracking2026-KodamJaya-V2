@@ -20,10 +20,16 @@ data class IdentityPayload(
     @SerializedName("id")         val id: String,
     @SerializedName("nrp")        val nrp: String,
     @SerializedName("name")       val name: String,
+    @SerializedName("satuan")     val satuan: String,
+    @SerializedName("batalyon")   val batalyon: String,
+    @SerializedName("peleton")    val peleton: String,
+    @SerializedName("regu")       val regu: String,
+    @SerializedName("kompi")      val kompi: String,
+    @SerializedName("divisi")     val divisi: String,
+    @SerializedName("brigade")    val brigade: String,
+    @SerializedName("team")       val team: String,
     @SerializedName("rank")       val rank: String,
     @SerializedName("unit")       val unit: String,
-    @SerializedName("battalion")  val battalion: String,
-    @SerializedName("squad")      val squad: String,
     @SerializedName("avatar_url") val avatarUrl: String
 )
 

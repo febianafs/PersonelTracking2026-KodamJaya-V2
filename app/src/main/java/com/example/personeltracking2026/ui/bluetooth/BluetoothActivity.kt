@@ -414,10 +414,14 @@ class BluetoothActivity : BaseActivity() {
     // ══════════════════════════════════════════════════════════════════════
 
     private fun connectToDevice(deviceModel: BluetoothDeviceModel) {
-        val btAdapter = bluetoothAdapter ?: return
-        deviceModel.state = DeviceState.CONNECTING
-        updateDeviceList()
-        bleService?.connect(deviceModel, btAdapter)
+        bleService?.disconnect()
+        lifecycleScope.launch {
+            delay(300)
+            val btAdapter = bluetoothAdapter ?: return@launch
+            deviceModel.state = DeviceState.CONNECTING
+            updateDeviceList()
+            bleService?.connect(deviceModel, btAdapter)
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════════

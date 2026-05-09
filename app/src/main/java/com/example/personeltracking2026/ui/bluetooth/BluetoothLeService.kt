@@ -1,5 +1,6 @@
 package com.example.personeltracking2026.ui.bluetooth
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +11,7 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import com.example.personeltracking2026.R
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,7 @@ class BluetoothLeService : Service() {
     private val binder = LocalBinder()
 
     private var bluetoothGatt: BluetoothGatt? = null
+    private var currentDeviceAddress: String? = null
 
     // ══════════════════════════════════════════════════════════════════════
     // LIFECYCLE SERVICE
@@ -64,10 +67,17 @@ class BluetoothLeService : Service() {
     // ══════════════════════════════════════════════════════════════════════
 
     fun connect(device: BluetoothDeviceModel, adapter: android.bluetooth.BluetoothAdapter) {
-        if (connectionState.value == ConnectionState.CONNECTED) {
-            Log.d(TAG, "Already connected, skip")
-            return
+        currentDeviceAddress = device.address
+
+        // Paksa disconnect gatt sebelumnya sebelum connect device
+        if (bluetoothGatt != null) {
+            disconnectGatt()
         }
+
+//        if (connectionState.value == ConnectionState.CONNECTED) {
+//            Log.d(TAG, "Already connected, skip")
+//            return
+//        }
 
         connectionState.value = ConnectionState.CONNECTING
         connectedDevice.value = device.copy(state = DeviceState.CONNECTING)
@@ -88,6 +98,8 @@ class BluetoothLeService : Service() {
 
     fun disconnect() {
         disconnectGatt()
+        bluetoothGatt = null
+        currentDeviceAddress = null
         connectionState.value = ConnectionState.DISCONNECTED
         bpmValue.value = 0
         connectedDevice.value = null
@@ -102,6 +114,7 @@ class BluetoothLeService : Service() {
 
     private val gattCallback = object : BluetoothGattCallback() {
 
+        @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
@@ -109,6 +122,8 @@ class BluetoothLeService : Service() {
                     try { gatt.discoverServices() } catch (e: SecurityException) { }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
+                    gatt.close()
+                    bluetoothGatt = null
                     Log.d(TAG, "GATT Disconnected")
                     connectionState.value = ConnectionState.DISCONNECTED
                     bpmValue.value = 0
@@ -143,6 +158,11 @@ class BluetoothLeService : Service() {
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic
         ) {
+            if (gatt.device.address != currentDeviceAddress) {
+                Log.d("BLE", "IGNORE OLD DEVICE: ${gatt.device.address}")
+                return
+            }
+
             if (characteristic.uuid == HEART_RATE_CHAR) {
                 val flag = characteristic.properties
                 val bpm = if (flag and 0x01 != 0) {
