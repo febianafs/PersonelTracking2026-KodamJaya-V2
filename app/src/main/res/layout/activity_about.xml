@@ -282,42 +282,42 @@
             </androidx.cardview.widget.CardView>
 
             <!-- CARD LEGAL NOTICE -->
-            <androidx.cardview.widget.CardView
-                android:id="@+id/cardLegal"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/background">
+<!--            <androidx.cardview.widget.CardView-->
+<!--                android:id="@+id/cardLegal"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_marginBottom="12dp"-->
+<!--                app:cardCornerRadius="16dp"-->
+<!--                app:cardElevation="4dp"-->
+<!--                app:cardBackgroundColor="@color/background">-->
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+<!--                <LinearLayout-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:orientation="vertical"-->
+<!--                    android:padding="16dp">-->
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Legal Notice"
-                        android:textColor="@color/primary"
-                        android:textStyle="bold"
-                        android:textSize="13sp"
-                        android:layout_marginBottom="8dp" />
+<!--                    <TextView-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="Legal Notice"-->
+<!--                        android:textColor="@color/primary"-->
+<!--                        android:textStyle="bold"-->
+<!--                        android:textSize="13sp"-->
+<!--                        android:layout_marginBottom="8dp" />-->
 
-                    <TextView
-                        android:id="@+id/tvLegalNotice"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="-"
-                        android:textColor="@color/gray"
-                        android:textSize="12sp"
-                        android:lineSpacingMultiplier="1.4" />
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvLegalNotice"-->
+<!--                        android:layout_width="match_parent"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="-"-->
+<!--                        android:textColor="@color/gray"-->
+<!--                        android:textSize="12sp"-->
+<!--                        android:lineSpacingMultiplier="1.4" />-->
 
-                </LinearLayout>
+<!--                </LinearLayout>-->
 
-            </androidx.cardview.widget.CardView>
+<!--            </androidx.cardview.widget.CardView>-->
 
             <!-- BUTTON PRIVACY POLICY -->
 <!--            <com.google.android.material.button.MaterialButton-->

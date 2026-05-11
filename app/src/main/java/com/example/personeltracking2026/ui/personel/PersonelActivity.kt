@@ -442,19 +442,19 @@ class PersonelActivity : BaseActivity() {
                     }
 
                     // Observe BPM realtime
-                    launch {
-                        BluetoothLeService.bpmValue.collect { bpm ->
-                            val app = application as App
-                            // simpan HR terbaru
-                            app.currentHeartRate = bpm
-                            app.currentHeartRateTs = System.currentTimeMillis()
-                            // update ViewModel untuk MQTT
-                            viewModel.updateHeartRate(
-                                bpm = bpm,
-                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
-                            )
-                        }
-                    }
+//                    launch {
+//                        BluetoothLeService.bpmValue.collect { bpm ->
+//                            val app = application as App
+//                            // simpan HR terbaru
+//                            app.currentHeartRate = bpm
+//                            app.currentHeartRateTs = System.currentTimeMillis()
+//                            // update ViewModel untuk MQTT
+//                            viewModel.updateHeartRate(
+//                                bpm = bpm,
+//                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
+//                            )
+//                        }
+//                    }
 
                     // Refresh UI + cek expired
                     launch {
@@ -569,7 +569,7 @@ class PersonelActivity : BaseActivity() {
             ?: sessionManager.getNrp().ifBlank { "-" }
 
         // Ambil dari classification dulu, fallback ke field langsung, fallback ke session
-        val rank = personel.getClassification("Satuan")
+        val rank = personel.getClassification("Rank")
             .ifBlank { personel?.rank?.name ?: "" }
             .ifBlank { sessionManager.getRank() }
             .ifBlank { "-" }
