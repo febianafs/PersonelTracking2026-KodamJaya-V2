@@ -1,11 +1,20 @@
 package com.example.personeltracking2026
 
 import android.app.Application
+import android.util.Log
 import com.example.personeltracking2026.core.mqtt.MqttManager
+import com.example.personeltracking2026.ui.bluetooth.BluetoothLeService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class App : Application() {
 
     lateinit var mqttManager: MqttManager
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // ── Heart Rate global state ─────────────────────────────────────
     // Diupdate oleh PersonelViewModel/BluetoothViewModel saat data BLE masuk.
@@ -20,6 +29,17 @@ class App : Application() {
         super.onCreate()
         mqttManager = MqttManager(this).apply {
             connect()
+        }
+
+        // GLOBAL BLE COLLECTOR
+        appScope.launch {
+            BluetoothLeService.bpmValue.collectLatest { bpm ->
+
+                currentHeartRate = bpm
+                currentHeartRateTs = System.currentTimeMillis()
+
+                Log.d("GLOBAL_HR", "HR = $bpm")
+            }
         }
 
         // TAMBAH INI — init SosManager di level App
