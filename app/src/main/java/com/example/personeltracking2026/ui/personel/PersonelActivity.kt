@@ -31,6 +31,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
+import com.example.personeltracking2026.core.device.DeviceMode
 import com.example.personeltracking2026.core.map.MapTypeManager
 import com.example.personeltracking2026.core.mqtt.MqttConfigManager
 import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
@@ -192,6 +193,8 @@ class PersonelActivity : BaseActivity() {
 
         val app = application as App
 
+        app.currentMode = DeviceMode.RADIO
+
         // FIX: SosManager di-init ulang di sini dengan locationProvider
         // yang membaca koordinat dari App level (bukan hanya dari PersonelActivity)
         // Ini memastikan SosManager selalu punya koordinat terbaru,
@@ -260,6 +263,7 @@ class PersonelActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        (application as App).currentMode = DeviceMode.RADIO
         SessionManager(this).saveLastScreen(LastScreen.PERSONEL)
         binding.mapView.onResume()
         val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)

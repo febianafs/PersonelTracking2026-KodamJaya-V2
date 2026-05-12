@@ -279,8 +279,24 @@ abstract class BaseActivity : AppCompatActivity() {
     }
 
     private fun logout() {
-        sessionManager.clearSession()
+        val app = application as com.example.personeltracking2026.App
+
+        // 1. Set mode NONE — hentikan publish loop di App level
+        app.currentMode = com.example.personeltracking2026.core.device.DeviceMode.NONE
+
+        // 2. Stop service — hentikan GPS dan publish di MqttLocationService
+        com.example.personeltracking2026.core.service.MqttLocationService.stopService(this)
+
+        // 3. Disconnect MQTT — putus koneksi broker seketika
+        app.mqttManager.disconnect()
+
+        // 4. Deactivate SOS
         SosManager.deactivate()
+
+        // 5. Clear session
+        sessionManager.clearSession()
+
+        // 6. Navigasi ke Login
         val intent = Intent(this, LoginActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)

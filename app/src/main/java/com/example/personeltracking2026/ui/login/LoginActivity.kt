@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.data.model.getClassification
@@ -48,6 +49,13 @@ class LoginActivity : AppCompatActivity() {
         setupKeyboardScroll()
         observeLoginState()
 
+        // Auto connect kalau sudah pernah login (ada token)
+        val session = SessionManager(this)
+        if (session.getToken() != null) {
+            (application as App).mqttManager.connect()
+        }
+
+
         binding.btnLogin.setOnClickListener {
             val username = binding.etUsername.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
@@ -65,6 +73,8 @@ class LoginActivity : AppCompatActivity() {
                             binding.btnLogin.isEnabled = false
                         }
                         is Result.Success -> {
+
+                            (application as App).mqttManager.connect()
                             binding.layoutConnecting.visibility = View.GONE
                             binding.btnLogin.isEnabled = true
 

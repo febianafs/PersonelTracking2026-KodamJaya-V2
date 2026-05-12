@@ -33,6 +33,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import com.example.personeltracking2026.core.device.DeviceMode
 
 class MqttLocationService : Service() {
 
@@ -226,7 +227,15 @@ class MqttLocationService : Service() {
 
     private fun publishLocation(lat: Double, lon: Double, accuracy: Float) {
         serviceScope.launch {
-            val mqttManager = (application as App).mqttManager
+            val app = application as App
+
+            if (app.currentMode != DeviceMode.RADIO) {
+                Log.d(TAG, "Not RADIO mode -> skip publish")
+                return@launch
+            }
+
+            val mqttManager = app.mqttManager
+
             if (!mqttManager.isConnected()) {
                 Log.d(TAG, "MQTT not connected, skip publish")
                 return@launch
@@ -246,7 +255,7 @@ class MqttLocationService : Service() {
             val nowMs = System.currentTimeMillis()
 
             // Baca HR dari App-level state (diisi oleh PersonelViewModel via BLE)
-            val app          = application as? com.example.personeltracking2026.App
+//            val app          = application as? com.example.personeltracking2026.App
             val hr           = app?.currentHeartRate   ?: 0
             val hrTs         = app?.currentHeartRateTs?.takeIf { it > 0 } ?: nowMs
             val payload = MqttPayloadBuilder.buildRadioDataPayload(

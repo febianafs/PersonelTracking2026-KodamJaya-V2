@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import com.example.personeltracking2026.core.device.DeviceMode
 
 class App : Application() {
 
@@ -25,11 +26,12 @@ class App : Application() {
     @Volatile var currentLon: Double = 0.0
     @Volatile var currentAccuracy: Float = 999f
 
+    @Volatile
+    var currentMode: DeviceMode = DeviceMode.NONE
+
     override fun onCreate() {
         super.onCreate()
-        mqttManager = MqttManager(this).apply {
-            connect()
-        }
+        mqttManager = MqttManager(this)
 
         // GLOBAL BLE COLLECTOR
         appScope.launch {
