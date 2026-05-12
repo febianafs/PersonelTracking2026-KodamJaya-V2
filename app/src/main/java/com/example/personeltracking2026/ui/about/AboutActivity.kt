@@ -50,6 +50,7 @@ class AboutActivity : BaseActivity() {
         }
 
         observeAboutState()
+        setupSwipeRefresh()
 
         val sessionManager = SessionManager(this)
 
@@ -68,6 +69,27 @@ class AboutActivity : BaseActivity() {
             ).show()
 
             finish()
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+
+        binding.swipeRefresh.setOnRefreshListener {
+
+            val token = SessionManager(this).getToken()
+
+            if (token != null) {
+                viewModel.fetchAboutUs(token)
+            } else {
+
+                binding.swipeRefresh.isRefreshing = false
+
+                Snackbar.make(
+                    binding.root,
+                    "Session expired. Please login again.",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
         }
     }
 
@@ -98,10 +120,13 @@ class AboutActivity : BaseActivity() {
                 viewModel.aboutState.collect { state ->
                     when (state) {
                         is Result.Loading -> {
-                            binding.progressBar.visibility = View.VISIBLE
-                            binding.scrollView.visibility = View.GONE
+                            if (!binding.swipeRefresh.isRefreshing) {
+                                binding.progressBar.visibility = View.VISIBLE
+                                binding.scrollView.visibility = View.GONE
+                            }
                         }
                         is Result.Success -> {
+                            binding.swipeRefresh.isRefreshing = false
                             binding.progressBar.visibility = View.GONE
                             binding.scrollView.visibility = View.VISIBLE
 
@@ -129,6 +154,7 @@ class AboutActivity : BaseActivity() {
                             playStaggeredAnimation()
                         }
                         is Result.Error -> {
+                            binding.swipeRefresh.isRefreshing = false
                             binding.progressBar.visibility = View.GONE
                             Snackbar.make(
                                 binding.root,
