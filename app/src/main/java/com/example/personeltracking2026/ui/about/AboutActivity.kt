@@ -20,6 +20,7 @@ import com.example.personeltracking2026.data.repository.Result
 import com.example.personeltracking2026.databinding.ActivityAboutBinding
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
+import com.example.personeltracking2026.core.session.SessionManager
 
 class AboutActivity : BaseActivity() {
 
@@ -49,6 +50,25 @@ class AboutActivity : BaseActivity() {
         }
 
         observeAboutState()
+
+        val sessionManager = SessionManager(this)
+
+        val token = sessionManager.getToken()
+
+        if (token != null) {
+
+            viewModel.fetchAboutUs(token)
+
+        } else {
+
+            Snackbar.make(
+                binding.root,
+                "Session expired. Please login again.",
+                Snackbar.LENGTH_LONG
+            ).show()
+
+            finish()
+        }
     }
 
     private fun playStaggeredAnimation() {

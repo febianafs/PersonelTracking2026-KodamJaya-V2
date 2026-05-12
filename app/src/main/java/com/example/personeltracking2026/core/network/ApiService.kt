@@ -15,8 +15,10 @@ interface ApiService {
     @POST("v1/mobile/login")
     suspend fun login(@Body request: LoginRequest): Response<LoginResponse>
 
-    @GET("v1/public/about-us")
-    suspend fun getAboutUs(): Response<AboutResponse>
+    @GET("v1/about-us")
+    suspend fun getAboutUs(
+        @Header("Authorization") token: String
+    ): Response<AboutResponse>
 
     @GET("v1/check-token")
     suspend fun checkToken(
