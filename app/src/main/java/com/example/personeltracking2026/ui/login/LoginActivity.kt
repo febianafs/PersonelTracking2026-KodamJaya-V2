@@ -74,6 +74,27 @@ class LoginActivity : AppCompatActivity() {
                         }
                         is Result.Success -> {
 
+                            binding.layoutConnecting.visibility = View.GONE
+                            binding.btnLogin.isEnabled = true
+
+                            val roles = state.data.data?.user?.roles ?: emptyList()
+
+                            val isPersonel = roles.any {
+                                it.name.equals("Personel", ignoreCase = true)
+                            }
+
+                            if (!isPersonel) {
+
+                                Snackbar.make(
+                                    binding.root,
+                                    "Access denied. Only Personel accounts can use this application.",
+                                    Snackbar.LENGTH_LONG
+                                ).show()
+
+                                viewModel.resetState()
+                                return@collect
+                            }
+
                             (application as App).mqttManager.connect()
                             binding.layoutConnecting.visibility = View.GONE
                             binding.btnLogin.isEnabled = true
