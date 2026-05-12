@@ -23,6 +23,7 @@ import com.example.personeltracking2026.ui.personel.PersonelActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.provider.Settings
+import com.example.personeltracking2026.App
 import com.example.personeltracking2026.core.navigation.LastScreen
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.PackageInfoCompat
@@ -66,6 +67,11 @@ class SplashActivity : AppCompatActivity() {
             // Start service setelah Activity benar-benar visible
             // delay singkat memastikan Activity sudah resumed
             delay(500)
+
+            if (sessionManager.isLoggedIn()) {
+                (application as App).mqttManager.connect()
+            }
+
             MqttLocationService.startService(this@SplashActivity)
 
             val hasUpdate = checkForUpdate()

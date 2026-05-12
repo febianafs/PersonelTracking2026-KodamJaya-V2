@@ -341,7 +341,8 @@ class MqttManager(private val context: Context) {
             put("timestamp", p.timestamp)
             put("serial_number", p.serialNumber)
             put("android_id", p.androidId)
-            put("stream_url", p.streamUrl)
+            put("rtmp_url", p.streamUrl)
+//            put("stream_url", p.streamUrl)
         }.toString()
     }
 

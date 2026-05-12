@@ -245,7 +245,7 @@
                             android:id="@+id/btnDiscard"
                             android:layout_width="wrap_content"
                             android:layout_height="36dp"
-                            android:text="Buang"
+                            android:text="Close"
                             android:textSize="11sp"
                             style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
 

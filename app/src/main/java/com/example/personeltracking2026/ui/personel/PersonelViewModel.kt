@@ -308,7 +308,7 @@ class PersonelViewModel(
                 val locationData = kotlinResult.getOrNull()
                 val error        = kotlinResult.exceptionOrNull()
 
-                if (locationData != null) {publishJob
+                if (locationData != null) {
                     val filteredLoc = processLocation(locationData) ?: return@collect
 
                     _locationState.value = LocationState(
