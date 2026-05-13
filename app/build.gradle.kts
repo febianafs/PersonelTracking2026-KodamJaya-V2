@@ -12,8 +12,9 @@ android {
         applicationId = "com.example.personeltracking2026"
         minSdk = 24
         targetSdk = 36
+
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
         buildConfigField("String", "APP_VERSION", "\"1.0.0\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -89,6 +90,11 @@ dependencies {
 
     // MQTT
     implementation("com.hivemq:hivemq-mqtt-client:1.3.3")
+
+    // AUTO UPDATE
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // --- Netty BOM: kunci versi semua modul Netty biar konsisten ---
     implementation(platform("io.netty:netty-bom:4.1.111.Final"))
