@@ -45,6 +45,7 @@ class SplashActivity : AppCompatActivity() {
     private lateinit var sessionManager: SessionManager
     private lateinit var loadingDialog: AlertDialog
     private val authRepository = AuthRepository()
+    private var downloadId: Long = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -194,9 +195,12 @@ class SplashActivity : AppCompatActivity() {
             DownloadManager.Request
                 .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
         )
+        request.setVisibleInDownloadsUi(true)
+
+        val fileName = apkUrl.substringAfterLast("/")
         request.setDestinationInExternalPublicDir(
             Environment.DIRECTORY_DOWNLOADS,
-            "update.apk"
+            fileName
         )
 
         loadingDialog =
@@ -209,7 +213,7 @@ class SplashActivity : AppCompatActivity() {
         val downloadManager =
             getSystemService(Context.DOWNLOAD_SERVICE)
                     as DownloadManager
-        val downloadId =
+        downloadId =
             downloadManager.enqueue(request)
 
         lifecycleScope.launch {
@@ -257,16 +261,37 @@ class SplashActivity : AppCompatActivity() {
         }
     }
 
-    private fun installAPK(uri: Uri) {
+    private fun installAPK(uri: Uri?) {
+
+        if (uri == null) {
+            Toast.makeText(
+                this,
+                "APK not found",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         val intent = Intent(Intent.ACTION_VIEW)
+
         intent.setDataAndType(
             uri,
             "application/vnd.android.package-archive"
         )
-        intent.flags =
-            Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
 
-        startActivity(intent)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            e.printStackTrace()
+
+            Toast.makeText(
+                this,
+                "Cannot open installer",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 }
