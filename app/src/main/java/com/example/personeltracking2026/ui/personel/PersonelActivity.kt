@@ -255,6 +255,8 @@ class PersonelActivity : BaseActivity() {
     override fun onStop() {
         super.onStop()
 
+        viewModel.stopPublishing()
+
         reconnectManager.stop()
 
         viewModel.unregisterBatteryReceiver(this)
@@ -351,7 +353,6 @@ class PersonelActivity : BaseActivity() {
                         state.data?.let {
                             if (!firstLocationReceived) {
                                 firstLocationReceived = true
-                                viewModel.startPublishing()
                             }
                         }
 

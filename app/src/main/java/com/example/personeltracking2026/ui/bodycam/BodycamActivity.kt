@@ -160,6 +160,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         sessionManager = SessionManager(this)
 
         val app = application as App
+        app.currentMode = DeviceMode.BODYCAM
+        Log.d("DEVICE_MODE", "BodycamActivity onCreate -> BODYCAM")
+
         SosManager.init(
             mqtt             = app.mqttManager,
             session          = sessionManager,
@@ -213,18 +216,13 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     override fun onResume() {
         Log.d("RTMP_DEBUG", "onResume")
         super.onResume()
-        SessionManager(this).saveLastScreen(LastScreen.BODYCAM)
-        // SARAN 1: cek isSurfaceReady sebelum startPreview
-        if (!isSurfaceReady) return
-        if (isInPictureInPictureMode) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-            == PackageManager.PERMISSION_GRANTED && isCameraEnabled
-        ) {
-            startCameraPreview()
-        }
 
         val app = application as App
         app.currentMode = DeviceMode.BODYCAM
+        Log.d("DEVICE_MODE", "BodycamActivity onResume -> BODYCAM")
+
+        SessionManager(this).saveLastScreen(LastScreen.BODYCAM)
+
         val identity = DeviceIdentityManager(this).getIdentity() ?: return
 
         SosManager.init(
@@ -235,6 +233,16 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             type             = SosManager.DeviceType.BODYCAM,
             locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
+
+        if (!isSurfaceReady) return
+        if (isInPictureInPictureMode) return
+
+        if (
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED && isCameraEnabled
+        ) {
+            startCameraPreview()
+        }
     }
 
     override fun onPause() {
