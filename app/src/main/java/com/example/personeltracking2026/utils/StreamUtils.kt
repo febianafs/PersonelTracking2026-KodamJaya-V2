@@ -1,6 +1,6 @@
 object StreamUtils {
 
     fun getRtmpUrl(serial: String): String {
-        return "rtmp://76.13.20.253:11935/personel/$serial"
+        return "rtmp://202.10.40.148:11935/personel/$serial"
     }
 }
