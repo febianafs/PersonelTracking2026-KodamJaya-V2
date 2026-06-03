@@ -45,7 +45,6 @@ class SplashActivity : AppCompatActivity() {
     private lateinit var sessionManager: SessionManager
     private lateinit var loadingDialog: AlertDialog
     private val authRepository = AuthRepository()
-    private var downloadId: Long = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,8 +56,6 @@ class SplashActivity : AppCompatActivity() {
         val fadeIn = AnimationUtils.loadAnimation(this, R.anim.splash_fade_in)
         binding.imgLogo.startAnimation(fadeIn)
 
-        binding = ActivitySplashBinding.inflate(layoutInflater)
-        setContentView(binding.root)
         binding.tvAppVersion.text =
             "ver ${BuildConfig.VERSION_NAME}"
 
@@ -71,9 +68,8 @@ class SplashActivity : AppCompatActivity() {
 
             if (sessionManager.isLoggedIn()) {
                 (application as App).mqttManager.connect()
+                MqttLocationService.startService(this@SplashActivity)
             }
-
-            MqttLocationService.startService(this@SplashActivity)
 
             val hasUpdate = checkForUpdate()
             minDelay.join()
@@ -84,28 +80,41 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private suspend fun validateToken(): Class<*> {
-        val token = sessionManager.getToken() ?: return LoginActivity::class.java
+        val token = sessionManager.getToken()
+            ?: return LoginActivity::class.java
 
         return when (val result = authRepository.checkToken(token)) {
-            is Result.Success -> {
+            is Result.Success -> getDestinationFromSession()
 
-                val lastScreen = sessionManager.getLastScreen()
+            is Result.Error -> {
+                when (result.message) {
+                    "TOKEN_EXPIRED",
+                    "TOKEN_FORBIDDEN" -> LoginActivity::class.java
 
-                if (lastScreen != null) {
-                    when (lastScreen) {
-                        LastScreen.PERSONEL -> PersonelActivity::class.java
-                        LastScreen.BODYCAM  -> BodycamActivity::class.java
-                    }
-                } else {
-                    // fallback kalau belum ada last screen
-                    when (sessionManager.getRole()) {
-                        SessionManager.ROLE_PERSONEL -> PersonelActivity::class.java
-                        SessionManager.ROLE_BODYCAM  -> BodycamActivity::class.java
-                        else                         -> MainActivity::class.java
-                    }
+                    "NETWORK_ERROR" -> getDestinationFromSession()
+
+                    else -> getDestinationFromSession()
                 }
             }
-            else -> LoginActivity::class.java
+
+            is Result.Loading -> getDestinationFromSession()
+        }
+    }
+
+    private fun getDestinationFromSession(): Class<*> {
+        val lastScreen = sessionManager.getLastScreen()
+
+        return if (lastScreen != null) {
+            when (lastScreen) {
+                LastScreen.PERSONEL -> PersonelActivity::class.java
+                LastScreen.BODYCAM -> BodycamActivity::class.java
+            }
+        } else {
+            when (sessionManager.getRole()) {
+                SessionManager.ROLE_PERSONEL -> PersonelActivity::class.java
+                SessionManager.ROLE_BODYCAM -> BodycamActivity::class.java
+                else -> MainActivity::class.java
+            }
         }
     }
 
@@ -195,12 +204,9 @@ class SplashActivity : AppCompatActivity() {
             DownloadManager.Request
                 .VISIBILITY_VISIBLE_NOTIFY_COMPLETED
         )
-        request.setVisibleInDownloadsUi(true)
-
-        val fileName = apkUrl.substringAfterLast("/")
         request.setDestinationInExternalPublicDir(
             Environment.DIRECTORY_DOWNLOADS,
-            fileName
+            "update.apk"
         )
 
         loadingDialog =
@@ -213,7 +219,7 @@ class SplashActivity : AppCompatActivity() {
         val downloadManager =
             getSystemService(Context.DOWNLOAD_SERVICE)
                     as DownloadManager
-        downloadId =
+        val downloadId =
             downloadManager.enqueue(request)
 
         lifecycleScope.launch {
@@ -261,37 +267,16 @@ class SplashActivity : AppCompatActivity() {
         }
     }
 
-    private fun installAPK(uri: Uri?) {
-
-        if (uri == null) {
-            Toast.makeText(
-                this,
-                "APK not found",
-                Toast.LENGTH_SHORT
-            ).show()
-            return
-        }
-
+    private fun installAPK(uri: Uri) {
         val intent = Intent(Intent.ACTION_VIEW)
-
         intent.setDataAndType(
             uri,
             "application/vnd.android.package-archive"
         )
+        intent.flags =
+            Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
 
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
-        try {
-            startActivity(intent)
-        } catch (e: Exception) {
-            e.printStackTrace()
-
-            Toast.makeText(
-                this,
-                "Cannot open installer",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
+        startActivity(intent)
     }
 }
