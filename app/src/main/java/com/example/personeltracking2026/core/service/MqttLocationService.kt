@@ -20,17 +20,20 @@ import android.content.IntentFilter
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.example.personeltracking2026.App
+import com.example.personeltracking2026.BuildConfig
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.location.AppLocationManager
 import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.mqtt.MqttReconnectManager
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.utils.Constants
+import com.example.personeltracking2026.utils.DeviceIdentityManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import com.example.personeltracking2026.core.device.DeviceMode
 
 class MqttLocationService : Service() {
 
@@ -184,7 +187,7 @@ class MqttLocationService : Service() {
             if (now - lastPublishTime >= publishIntervalMs) {
                 lastPublishTime = now
                 Log.d(TAG, "Location [$source]: $lat, $lon → publishing")
-                publishLocation(lat, lon)
+                publishLocation(lat, lon, accuracy)
             } else {
                 Log.d(TAG, "Location [$source]: throttled, skip")
             }
@@ -222,33 +225,55 @@ class MqttLocationService : Service() {
     //  Publish MQTT
     // ─────────────────────────────────────────────
 
-    private fun publishLocation(lat: Double, lon: Double) {
+    private fun publishLocation(lat: Double, lon: Double, accuracy: Float) {
         serviceScope.launch {
-            val mqttManager = (application as App).mqttManager
+            val app = application as App
+
+            if (app.currentMode != DeviceMode.RADIO) {
+                Log.d(TAG, "Not RADIO mode -> skip publish")
+                return@launch
+            }
+
+            val mqttManager = app.mqttManager
+
             if (!mqttManager.isConnected()) {
                 Log.d(TAG, "MQTT not connected, skip publish")
                 return@launch
             }
 
-            val serialNumber = Settings.Secure.getString(
-                contentResolver,
-                Settings.Secure.ANDROID_ID
-            ) ?: "unknown"
+            val deviceManager = DeviceIdentityManager(this@MqttLocationService)
+            val identity = deviceManager.getIdentity()
+
+            if (identity == null) {
+                Log.e("MQTT", "Serial number is required")
+                return@launch
+            }
+
+            val serialNumber = identity.serial
+            val androidId    = identity.androidId
 
             val nowMs = System.currentTimeMillis()
 
-            val payload = MqttPayloadBuilder.buildDataPayload(
+            // Baca HR dari App-level state (diisi oleh PersonelViewModel via BLE)
+//            val app          = application as? com.example.personeltracking2026.App
+            val hr           = app?.currentHeartRate   ?: 0
+            val hrTs         = app?.currentHeartRateTs?.takeIf { it > 0 } ?: nowMs
+            val payload = MqttPayloadBuilder.buildRadioDataPayload(
                 session      = sessionManager,
                 serialNumber = serialNumber,
+                androidId    = androidId,
                 lat          = lat,
                 lon          = lon,
+                acc          = accuracy,
                 gpsTimestamp = nowMs,
-                heartrate    = 0,
-                heartrateTs  = nowMs,
-                batteryLevel = getBatteryLevel()
+                heartrate    = hr,
+                heartrateTs  = hrTs,
+                batteryLevel = getBatteryLevel(),
+                appVersion   = BuildConfig.APP_VERSION,
+                rtmpUrl      = StreamUtils.getRtmpUrl(serialNumber)
             )
 
-            mqttManager.publishData(payload)
+            mqttManager.publishRadioData(payload)
         }
     }
 
@@ -284,7 +309,7 @@ class MqttLocationService : Service() {
                 "Personel Tracking",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Tracking lokasi personel aktif"
+                description = "Tracking Location Personel Active"
                 setShowBadge(false)
             }
             val nm = getSystemService(NotificationManager::class.java)
@@ -304,8 +329,8 @@ class MqttLocationService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Personel Tracking Aktif")
-            .setContentText("Mengirim lokasi secara berkala")
+            .setContentTitle("Personel Tracking Active")
+            .setContentText("Send Location Regulary")
             .setSmallIcon(R.drawable.ic_location_pin)
             .setOngoing(true)
             .setContentIntent(pendingIntent)

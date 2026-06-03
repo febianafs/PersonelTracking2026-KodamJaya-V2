@@ -2,6 +2,7 @@ package com.example.personeltracking2026.ui.login
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.animation.AnimationUtils
 import androidx.activity.viewModels
@@ -12,8 +13,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.session.SessionManager
+import com.example.personeltracking2026.data.model.getClassification
 import com.example.personeltracking2026.data.repository.LoginRepository
 import com.example.personeltracking2026.data.repository.Result
 import com.example.personeltracking2026.databinding.ActivityLoginBinding
@@ -46,6 +49,13 @@ class LoginActivity : AppCompatActivity() {
         setupKeyboardScroll()
         observeLoginState()
 
+        // Auto connect kalau sudah pernah login (ada token)
+        val session = SessionManager(this)
+        if (session.getToken() != null) {
+            (application as App).mqttManager.connect()
+        }
+
+
         binding.btnLogin.setOnClickListener {
             val username = binding.etUsername.text.toString().trim()
             val password = binding.etPassword.text.toString().trim()
@@ -63,12 +73,97 @@ class LoginActivity : AppCompatActivity() {
                             binding.btnLogin.isEnabled = false
                         }
                         is Result.Success -> {
+
+                            binding.layoutConnecting.visibility = View.GONE
+                            binding.btnLogin.isEnabled = true
+
+                            val roles = state.data.data?.user?.roles ?: emptyList()
+
+                            val isPersonel = roles.any {
+                                it.name.equals("Personel", ignoreCase = true)
+                            }
+
+                            if (!isPersonel) {
+
+                                Snackbar.make(
+                                    binding.root,
+                                    "Access denied. Only Personel accounts can use this application.",
+                                    Snackbar.LENGTH_LONG
+                                ).show()
+
+                                viewModel.resetState()
+                                return@collect
+                            }
+
+                            (application as App).mqttManager.connect()
                             binding.layoutConnecting.visibility = View.GONE
                             binding.btnLogin.isEnabled = true
 
                             val token = state.data.data?.token ?: ""
-                            val name = state.data.data?.user?.name ?: ""
-                            SessionManager(this@LoginActivity).saveSession(token, name)
+
+                            val name = state.data.data?.profile?.full_name
+                                ?: state.data.data?.user?.name
+                                ?: ""
+
+                            val profile = state.data.data?.profile
+
+                            val avatarUrl = profile?.avatar_url ?: ""
+                            Log.d("LOGIN_PROFILE", profile.toString())
+                            Log.d("LOGIN_AVATAR_RAW", profile?.avatar_url ?: "NULL")
+
+                            val nrp = profile?.nrp
+                                ?.takeIf { it.isNotBlank() }
+                                ?: state.data.data?.user?.username
+                                ?: ""
+
+                            val satuan   = profile.getClassification("Satuan")
+                            val batalyon = profile.getClassification("Batalyon")
+                            val peleton  = profile.getClassification("Peleton")
+                            val regu     = profile.getClassification("Regu")
+                            val kompi    = profile.getClassification("Kompi")
+                            val divisi   = profile.getClassification("Divisi")
+                            val brigade  = profile.getClassification("Brigade")
+                            val team     = profile.getClassification("Team")
+                            val unit     = profile.getClassification("Unit")
+                            val rank     = profile.getClassification("Rank")
+
+                            val sessionManager = SessionManager(this@LoginActivity)
+
+                            sessionManager.saveSession(token, name)
+
+                            sessionManager.savePersonelDetail(
+                                id         = sessionManager.getUserId()?.toString() ?: "",
+                                nrp        = nrp,
+                                name       = name,
+                                satuan     = satuan,
+                                batalyon   = batalyon,
+                                peleton    = peleton,
+                                regu       = regu,
+                                kompi      = kompi,
+                                divisi     = divisi,
+                                brigade    = brigade,
+                                team       = team,
+                                unit       = unit,
+                                rank       = rank,
+                                avatarUrl  = avatarUrl
+                            )
+
+                            Log.d("SESSION_AVATAR", sessionManager.getAvatarUrl())
+
+                            Log.d("LOGIN_AVATAR", "avatarUrl = $avatarUrl")
+                            Log.d("LOGIN_NAME", "name = $name")
+                            Log.d("SESSION_TEST", "ID        = ${sessionManager.getId()}")
+                            Log.d("SESSION_TEST", "NRP       = ${sessionManager.getNrp()}")
+                            Log.d("SESSION_TEST", "SATUAN    = ${sessionManager.getSatuan()}")
+                            Log.d("SESSION_TEST", "BATALYON  = ${sessionManager.getBatalyon()}")
+                            Log.d("SESSION_TEST", "PELETON   = ${sessionManager.getPeleton()}")
+                            Log.d("SESSION_TEST", "REGU      = ${sessionManager.getRegu()}")
+                            Log.d("SESSION_TEST", "KOMPI     = ${sessionManager.getKompi()}")
+                            Log.d("SESSION_TEST", "DIVISI    = ${sessionManager.getDivisi()}")
+                            Log.d("SESSION_TEST", "BRIGADE   = ${sessionManager.getBrigade()}")
+                            Log.d("SESSION_TEST", "TEAM      = ${sessionManager.getTeam()}")
+                            Log.d("SESSION_TEST", "UNIT      = ${sessionManager.getUnit()}")
+                            Log.d("SESSION_TEST", "RANK      = ${sessionManager.getRank()}")
 
                             val intent = Intent(this@LoginActivity, MainActivity::class.java)
                             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK

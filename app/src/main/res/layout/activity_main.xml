@@ -87,7 +87,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="SELECT ROLE"
+                    android:text="SELECT DEVICE"
                     android:textColor="@color/white"
                     android:textSize="20sp"
                     android:textStyle="bold"
@@ -138,7 +138,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Personel"
+                                android:text="HT"
                                 android:textStyle="bold"
                                 android:textColor="@color/white"
                                 android:textSize="14sp"
@@ -147,7 +147,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Personel Access"
+                                android:text="HT Access"
                                 android:textColor="@color/gray"
                                 android:textSize="11sp"
                                 android:gravity="center"

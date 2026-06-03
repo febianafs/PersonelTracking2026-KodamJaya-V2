@@ -1,19 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/swipeRefresh"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0A1A2F"
-    android:fillViewport="true"
-    android:overScrollMode="never"
     android:fitsSystemWindows="true"
     tools:context=".ui.personel.PersonelActivity">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/nestedScrollView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent"
+        android:background="#0A1A2F"
+        android:fillViewport="true"
+        android:overScrollMode="never">
+
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
         <!-- TOOLBAR -->
         <com.google.android.material.appbar.MaterialToolbar
@@ -139,29 +146,64 @@
                         <!--                            android:layout_marginEnd="8dp"/>-->
 
                         <!-- ICON LAYERS — ganti tipe map -->
-                        <ImageButton
-                            android:id="@+id/btnMapType"
-                            android:layout_width="26dp"
-                            android:layout_height="26dp"
-                            android:src="@drawable/ic_layers"
-                            android:background="@drawable/bg_icon_pin"
-                            android:contentDescription="Map Type"
-                            android:scaleType="centerInside"
-                            android:padding="4dp"
-                            app:tint="@color/white"/>
+<!--                        <ImageButton-->
+<!--                            android:id="@+id/btnMapType"-->
+<!--                            android:layout_width="26dp"-->
+<!--                            android:layout_height="26dp"-->
+<!--                            android:src="@drawable/ic_layers"-->
+<!--                            android:background="@drawable/bg_icon_pin"-->
+<!--                            android:contentDescription="Map Type"-->
+<!--                            android:scaleType="centerInside"-->
+<!--                            android:padding="4dp"-->
+<!--                            app:tint="@color/white"/>-->
 
                     </LinearLayout>
 
                     <FrameLayout
                         android:layout_width="match_parent"
-                        android:layout_height="200dp"
+                        android:layout_height="170dp"
                         android:layout_marginBottom="1dp">
 
-                        <!-- MAP VIEW -->
-                        <org.maplibre.android.maps.MapView
-                            android:id="@+id/mapView"
+                        <FrameLayout
                             android:layout_width="match_parent"
-                            android:layout_height="200dp"/>
+                            android:layout_height="144dp">
+
+                            <!-- MAP VIEW -->
+                            <org.maplibre.android.maps.MapView
+                                android:id="@+id/mapView"
+                                android:layout_width="match_parent"
+                                android:layout_height="144dp"/>
+
+                            <!-- ZOOM BUTTON -->
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="vertical"
+                                android:layout_gravity="end|center"
+                                android:layout_marginEnd="5dp">
+
+                                <ImageButton
+                                    android:id="@+id/btnZoomIn"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:layout_marginBottom="6dp"
+                                    android:src="@drawable/ic_zoom_in"
+                                    android:background="@android:color/white"
+                                    app:tint="@android:color/black" />
+
+                                <ImageButton
+                                    android:id="@+id/btnZoomOut"
+                                    android:layout_width="20dp"
+                                    android:layout_height="20dp"
+                                    android:src="@drawable/ic_zoom_out"
+                                    android:background="@android:color/white"
+                                    android:layout_marginTop="4dp"
+                                    app:tint="@android:color/black" />
+
+                            </LinearLayout>
+
+
+                        </FrameLayout>
 
                         <!-- KOORDINAT + VIEW FULL MAP -->
                         <LinearLayout
@@ -217,33 +259,7 @@
 
                         </LinearLayout>
 
-                        <!-- ZOOM BUTTON -->
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            android:layout_gravity="end|bottom"
-                            android:layout_marginEnd="5dp"
-                            android:layout_marginBottom="40dp">
 
-                            <ImageButton
-                                android:id="@+id/btnZoomIn"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
-                                android:src="@drawable/ic_zoom_in"
-                                android:background="@android:color/white"
-                                app:tint="@android:color/black" />
-
-                            <ImageButton
-                                android:id="@+id/btnZoomOut"
-                                android:layout_width="20dp"
-                                android:layout_height="20dp"
-                                android:src="@drawable/ic_zoom_out"
-                                android:background="@android:color/white"
-                                android:layout_marginTop="4dp"
-                                app:tint="@android:color/black" />
-
-                        </LinearLayout>
 
                     </FrameLayout>
 
@@ -252,5 +268,8 @@
 
         </LinearLayout>
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</androidx.core.widget.NestedScrollView>
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+    </androidx.core.widget.NestedScrollView>
+
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

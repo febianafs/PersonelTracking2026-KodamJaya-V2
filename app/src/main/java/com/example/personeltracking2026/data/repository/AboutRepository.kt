@@ -7,21 +7,37 @@ class AboutRepository {
 
     private val api = RetrofitClient.instance
 
-    suspend fun getAboutUs(): Result<AboutResponse> {
+    suspend fun getAboutUs(token: String): Result<AboutResponse> {
         return try {
-            val response = api.getAboutUs()
+
+            val response = api.getAboutUs(
+                "Bearer $token"
+            )
+
             if (response.isSuccessful) {
+
                 val body = response.body()
+
                 if (body != null) {
                     Result.Success(body)
                 } else {
-                    Result.Error("Response body kosong")
+                    Result.Error("Empty response body")
                 }
+
             } else {
-                Result.Error("Gagal: ${response.code()} ${response.message()}")
+
+                Result.Error(
+                    "Failed: ${response.code()} ${response.message()}"
+                )
+
             }
+
         } catch (e: Exception) {
-            Result.Error(e.localizedMessage ?: "Terjadi kesalahan")
+
+            Result.Error(
+                e.localizedMessage ?: "Something went wrong"
+            )
+
         }
     }
 }

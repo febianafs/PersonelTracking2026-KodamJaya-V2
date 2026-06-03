@@ -70,18 +70,18 @@
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintVertical_bias="0.458" />
 
-                    <!-- BPM CATEGORY (TENGAH BAWAH) -->
-                    <TextView
-                        android:id="@+id/tvBpmCategory"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="normal"
-                        android:textColor="#69F0AE"
-                        android:textSize="10sp"
+<!--                    &lt;!&ndash; BPM CATEGORY (TENGAH BAWAH) &ndash;&gt;-->
+<!--                    <TextView-->
+<!--                        android:id="@+id/tvBpmCategory"-->
+<!--                        android:layout_width="wrap_content"-->
+<!--                        android:layout_height="wrap_content"-->
+<!--                        android:text="normal"-->
+<!--                        android:textColor="#69F0AE"-->
+<!--                        android:textSize="10sp"-->
 
-                        app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintStart_toStartOf="parent"
-                        app:layout_constraintTop_toBottomOf="@+id/tvHeartRate" />
+<!--                        app:layout_constraintEnd_toEndOf="parent"-->
+<!--                        app:layout_constraintStart_toStartOf="parent"-->
+<!--                        app:layout_constraintTop_toBottomOf="@+id/tvHeartRate" />-->
 
                     <!-- BLE SETTINGS (KANAN BAWAH) -->
                     <TextView
@@ -90,11 +90,10 @@
                         android:layout_height="wrap_content"
                         android:text="BLE settings ›"
                         android:textColor="#4FC3F7"
-                        android:textSize="11sp"
+                        android:textSize="13sp"
 
                         app:layout_constraintEnd_toEndOf="parent"
-                        app:layout_constraintBottom_toBottomOf="parent"
-                        app:layout_constraintTop_toBottomOf="@id/tvBpmCategory"/>
+                        app:layout_constraintBottom_toBottomOf="parent"/>
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
 

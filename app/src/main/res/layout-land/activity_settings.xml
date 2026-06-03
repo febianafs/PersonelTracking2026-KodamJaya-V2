@@ -25,7 +25,7 @@
             android:layout_height="match_parent"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:paddingHorizontal="16dp">
+            android:paddingHorizontal="4dp">
 
             <ImageButton
                 android:id="@+id/btnBack"
@@ -44,7 +44,7 @@
                 android:textColor="@color/primary"
                 android:textStyle="bold"
                 android:textSize="14sp"
-                android:layout_marginStart="8dp" />
+                android:layout_marginStart="4dp" />
 
             <View
                 android:layout_width="0dp"
@@ -54,7 +54,6 @@
                 android:background="@drawable/bg_toolbar_stripes" />
 
         </LinearLayout>
-
     </com.google.android.material.appbar.MaterialToolbar>
 
     <!-- CONTENT ROW -->
@@ -67,7 +66,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- KOLOM KIRI — Connection + Interval -->
+        <!-- KOLOM KIRI: Connection + Interval -->
         <androidx.core.widget.NestedScrollView
             android:layout_width="0dp"
             android:layout_height="match_parent"
@@ -98,6 +97,7 @@
                         android:orientation="vertical"
                         android:padding="14dp">
 
+                        <!-- Header: icon + title + status dot -->
                         <LinearLayout
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -113,26 +113,177 @@
                                 android:layout_marginEnd="8dp" />
 
                             <TextView
-                                android:layout_width="wrap_content"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
+                                android:layout_weight="1"
                                 android:text="MQTT Connection"
                                 android:textColor="@color/primary"
                                 android:textStyle="bold"
-                                android:textSize="13sp"
-                                android:letterSpacing="0.05" />
+                                android:textSize="13sp" />
 
+                            <LinearLayout
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:orientation="horizontal"
+                                android:gravity="center_vertical">
+
+                                <View
+                                    android:id="@+id/dotConnection"
+                                    android:layout_width="8dp"
+                                    android:layout_height="8dp"
+                                    android:background="@drawable/bg_dot_connected"
+                                    android:backgroundTint="@color/gray" />
+
+                                <TextView
+                                    android:id="@+id/tvConnectionStatus"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="6dp"
+                                    android:text="Disconnected"
+                                    android:textColor="@color/gray"
+                                    android:textSize="11sp" />
+
+                            </LinearLayout>
                         </LinearLayout>
 
+                        <!-- Connection Type -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Connection Type"
+                            android:textColor="@color/gray"
+                            android:textSize="12sp"
+                            android:layout_marginBottom="6dp" />
+
+                        <RadioGroup
+                            android:id="@+id/radioGroupConnectionType"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="12dp"
+                            android:background="@color/background2"
+                            android:orientation="horizontal"
+                            android:padding="4dp">
+
+                            <RadioButton
+                                android:id="@+id/radioTcp"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:buttonTint="@color/primary"
+                                android:checked="false"
+                                android:enabled="true"
+                                android:paddingStart="8dp"
+                                android:text="TCP"
+                                android:textColor="@color/gray"
+                                android:textSize="13sp" />
+
+                            <RadioButton
+                                android:id="@+id/radioWebSocket"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:buttonTint="@color/primary"
+                                android:checked="true"
+                                android:enabled="true"
+                                android:paddingStart="8dp"
+                                android:text="WebSocket"
+                                android:textColor="@color/white"
+                                android:textSize="13sp" />
+
+                        </RadioGroup>
+
+                        <!-- TCP Port + WebSocket Port -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="10dp"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginEnd="6dp"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="TCP Port"
+                                    android:textColor="@color/gray"
+                                    android:textSize="12sp"
+                                    android:layout_marginBottom="4dp" />
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    app:boxBackgroundMode="outline"
+                                    app:boxBackgroundColor="@color/background2"
+                                    app:hintTextColor="@color/gray"
+                                    app:boxStrokeColor="@color/gray">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/etTcp"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:hint="1883"
+                                        android:inputType="number"
+                                        android:minHeight="48dp"
+                                        android:textColor="@color/white"
+                                        android:textColorHint="@color/gray"
+                                        android:textSize="13sp" />
+
+                                </com.google.android.material.textfield.TextInputLayout>
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:layout_marginStart="6dp"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="WebSocket Port"
+                                    android:textColor="@color/gray"
+                                    android:textSize="12sp"
+                                    android:layout_marginBottom="4dp" />
+
+                                <com.google.android.material.textfield.TextInputLayout
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    app:boxBackgroundMode="outline"
+                                    app:boxBackgroundColor="@color/background2"
+                                    app:hintTextColor="@color/gray"
+                                    app:boxStrokeColor="@color/gray">
+
+                                    <com.google.android.material.textfield.TextInputEditText
+                                        android:id="@+id/etWs"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:hint="9001"
+                                        android:inputType="number"
+                                        android:minHeight="48dp"
+                                        android:textColor="@color/white"
+                                        android:textColorHint="@color/gray"
+                                        android:textSize="13sp" />
+
+                                </com.google.android.material.textfield.TextInputLayout>
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Server Host -->
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Server Host"
                             android:textColor="@color/gray"
                             android:textSize="12sp"
-                            android:layout_marginBottom="6dp" />
+                            android:layout_marginBottom="4dp" />
 
                         <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/tilServer"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginBottom="10dp"
@@ -145,45 +296,111 @@
                                 android:id="@+id/etServer"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:hint="e.g. 192.168.1.1"
+                                android:hint="192.168.1.1"
+                                android:inputType="textUri"
+                                android:minHeight="48dp"
                                 android:textColor="@color/white"
                                 android:textColorHint="@color/gray"
-                                android:inputType="textUri"
                                 android:textSize="13sp" />
 
                         </com.google.android.material.textfield.TextInputLayout>
 
+                        <!-- Username -->
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Port"
+                            android:text="Username"
                             android:textColor="@color/gray"
                             android:textSize="12sp"
-                            android:layout_marginBottom="6dp" />
+                            android:layout_marginBottom="4dp" />
 
                         <com.google.android.material.textfield.TextInputLayout
-                            android:id="@+id/tilPort"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_marginBottom="10dp"
                             app:boxBackgroundMode="outline"
                             app:boxBackgroundColor="@color/background2"
                             app:hintTextColor="@color/gray"
                             app:boxStrokeColor="@color/gray">
 
                             <com.google.android.material.textfield.TextInputEditText
-                                android:id="@+id/etPort"
+                                android:id="@+id/etUsername"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:hint="e.g. 1883"
+                                android:hint="username"
+                                android:importantForAutofill="no"
+                                android:inputType="text"
+                                android:minHeight="48dp"
                                 android:textColor="@color/white"
                                 android:textColorHint="@color/gray"
-                                android:inputType="number"
                                 android:textSize="13sp" />
 
                         </com.google.android.material.textfield.TextInputLayout>
 
-                    </LinearLayout>
+                        <!-- Password -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Password"
+                            android:textColor="@color/gray"
+                            android:textSize="12sp"
+                            android:layout_marginBottom="4dp" />
 
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/tilPassword"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:boxBackgroundMode="outline"
+                            app:boxBackgroundColor="@color/background2"
+                            app:hintTextColor="@color/gray"
+                            app:boxStrokeColor="@color/gray"
+                            app:endIconMode="password_toggle">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etPassword"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:hint="password"
+                                android:importantForAutofill="no"
+                                android:inputType="textPassword"
+                                android:minHeight="48dp"
+                                android:textColor="@color/white"
+                                android:textColorHint="@color/gray"
+                                android:textSize="13sp" />
+
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <!-- Tombol Test + Save -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:gravity="end"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnTestConnection"
+                                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginEnd="8dp"
+                                android:text="Test"
+                                android:textColor="@color/primary"
+                                android:textSize="12sp"
+                                app:strokeColor="@color/primary" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/btnSaveConnection"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:backgroundTint="@color/primary"
+                                android:text="Save"
+                                android:textColor="@color/background2"
+                                android:textSize="12sp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
                 </androidx.cardview.widget.CardView>
 
                 <!-- CARD INTERVAL -->
@@ -211,7 +428,7 @@
                             <ImageView
                                 android:layout_width="16dp"
                                 android:layout_height="16dp"
-                                android:src="@drawable/ic_live"
+                                android:src="@drawable/ic_sync"
                                 app:tint="@color/primary"
                                 android:layout_marginEnd="8dp" />
 
@@ -221,8 +438,7 @@
                                 android:text="Data Interval"
                                 android:textColor="@color/primary"
                                 android:textStyle="bold"
-                                android:textSize="13sp"
-                                android:letterSpacing="0.05" />
+                                android:textSize="13sp" />
 
                         </LinearLayout>
 
@@ -259,126 +475,9 @@
                         </com.google.android.material.textfield.TextInputLayout>
 
                     </LinearLayout>
-
                 </androidx.cardview.widget.CardView>
 
             </LinearLayout>
-
-        </androidx.core.widget.NestedScrollView>
-
-        <!-- KOLOM KANAN — Behaviour -->
-        <androidx.core.widget.NestedScrollView
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:overScrollMode="never"
-            android:clipToPadding="false"
-            android:paddingBottom="16dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <!-- CARD BEHAVIOUR -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardBehaviour"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="4dp"
-                    app:cardBackgroundColor="@color/background">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:padding="14dp">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical"
-                            android:layout_marginBottom="16dp">
-
-                            <ImageView
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
-                                android:src="@drawable/ic_live"
-                                app:tint="@color/primary"
-                                android:layout_marginEnd="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Behaviour"
-                                android:textColor="@color/primary"
-                                android:textStyle="bold"
-                                android:textSize="13sp"
-                                android:letterSpacing="0.05" />
-
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal"
-                            android:gravity="center_vertical">
-
-                            <LinearLayout
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:orientation="vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Auto Reconnect"
-                                    android:textColor="@color/white"
-                                    android:textSize="13sp"
-                                    android:textStyle="bold" />
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="Automatically reconnect when connection is lost"
-                                    android:textColor="@color/gray"
-                                    android:textSize="11sp"
-                                    android:layout_marginTop="2dp" />
-
-                            </LinearLayout>
-
-                            <com.google.android.material.materialswitch.MaterialSwitch
-                                android:id="@+id/switchAutoReconnect"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:checked="true"
-                                android:layout_marginStart="12dp" />
-
-                        </LinearLayout>
-
-                    </LinearLayout>
-
-                </androidx.cardview.widget.CardView>
-
-                <!-- SAVED INDICATOR -->
-                <TextView
-                    android:id="@+id/tvSaved"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="✓ Saved"
-                    android:textColor="@color/primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:visibility="gone"
-                    android:layout_gravity="end"
-                    android:layout_marginTop="8dp" />
-
-            </LinearLayout>
-
         </androidx.core.widget.NestedScrollView>
 
     </LinearLayout>

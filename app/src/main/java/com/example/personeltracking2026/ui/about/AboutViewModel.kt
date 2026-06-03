@@ -15,14 +15,10 @@ class AboutViewModel(private val repository: AboutRepository) : ViewModel() {
     private val _aboutState = MutableStateFlow<Result<AboutResponse>?>(null)
     val aboutState: StateFlow<Result<AboutResponse>?> = _aboutState
 
-    init {
-        fetchAboutUs()
-    }
-
-    fun fetchAboutUs() {
+    fun fetchAboutUs(token: String) {
         viewModelScope.launch {
             _aboutState.value = Result.Loading
-            _aboutState.value = repository.getAboutUs()
+            _aboutState.value = repository.getAboutUs(token)
         }
     }
 

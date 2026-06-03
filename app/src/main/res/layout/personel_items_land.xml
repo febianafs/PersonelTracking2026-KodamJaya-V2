@@ -35,7 +35,7 @@
                         android:layout_width="56dp"
                         android:layout_height="56dp"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_background"
+                        android:src="@drawable/ic_avatar"
                         android:background="#0D2138"
                         android:layout_gravity="center_horizontal"/>
 
@@ -98,7 +98,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="Pangkat"
+                    android:text="Rank"
                     android:textColor="#FFFFFF"
                     android:textSize="10sp"
                     android:gravity="center_horizontal"
@@ -113,31 +113,37 @@
                     android:layout_marginBottom="6dp"/>
 
                 <!-- LAT + LON + BPM -->
-                <TextView
-                    android:id="@+id/tvLat"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Lat : -7.868729"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10sp"/>
+<!--                <TextView-->
+<!--                    android:id="@+id/tvLat"-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:text="Lat : -7.868729"-->
+<!--                    android:textColor="#FFFFFF"-->
+<!--                    android:textSize="10sp"/>-->
 
-                <TextView
-                    android:id="@+id/tvLon"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Long : 105.643117"
-                    android:textColor="#FFFFFF"
-                    android:textSize="10sp"
-                    android:layout_marginTop="1dp"/>
+<!--                <TextView-->
+<!--                    android:id="@+id/tvLon"-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:text="Long : 105.643117"-->
+<!--                    android:textColor="#FFFFFF"-->
+<!--                    android:textSize="10sp"-->
+<!--                    android:layout_marginTop="1dp"/>-->
 
-                <TextView
-                    android:id="@+id/tvBpmCategory"
+<!--                <TextView-->
+<!--                    android:id="@+id/tvBpmCategory"-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:text="HR : Normal"-->
+<!--                    android:textColor="#69F0AE"-->
+<!--                    android:textSize="10sp"-->
+<!--                    android:layout_marginTop="1dp"/>-->
+
+                <!-- SPACER -->
+                <View
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="HR : Normal"
-                    android:textColor="#69F0AE"
-                    android:textSize="10sp"
-                    android:layout_marginTop="1dp"/>
+                    android:layout_height="0dp"
+                    android:layout_weight="1"/>
 
                 <!-- VIEW FULL DATA -->
                 <TextView
@@ -146,18 +152,12 @@
                     android:layout_height="wrap_content"
                     android:text="View full data ›"
                     android:textColor="@color/primary"
-                    android:textSize="10sp"
+                    android:textSize="13sp"
                     android:clickable="true"
                     android:focusable="true"
                     android:background="?attr/selectableItemBackground"
                     android:layout_gravity="end"
                     android:layout_marginTop="4dp"/>
-
-                <!-- SPACER -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"/>
 
                 <!-- DIVIDER BAWAH -->
                 <View

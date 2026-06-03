@@ -128,7 +128,7 @@
                         android:layout_height="wrap_content"
                         android:text="Settings ›"
                         android:textColor="#4FC3F7"
-                        android:textSize="10sp"
+                        android:textSize="13sp"
                         android:clickable="true"
                         android:focusable="true"
 

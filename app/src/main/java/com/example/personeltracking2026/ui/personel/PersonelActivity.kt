@@ -1,46 +1,66 @@
 package com.example.personeltracking2026.ui.personel
 
 import android.Manifest
+import android.content.Context
+import android.content.Context.MODE_PRIVATE
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
+import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startActivity
 import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
+import com.example.personeltracking2026.core.device.DeviceMode
 import com.example.personeltracking2026.core.map.MapTypeManager
 import com.example.personeltracking2026.core.mqtt.MqttConfigManager
 import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.mqtt.MqttReconnectManager
+import com.example.personeltracking2026.core.navigation.LastScreen
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.sos.SosManager
+import com.example.personeltracking2026.data.model.LocationData
 import com.example.personeltracking2026.data.model.PersonelData
+import com.example.personeltracking2026.data.model.getClassification
 import com.example.personeltracking2026.data.repository.LocationRepository
 import com.example.personeltracking2026.data.repository.PersonelRepository
 import com.example.personeltracking2026.databinding.ActivityPersonelBinding
+import com.example.personeltracking2026.ui.bluetooth.BluetoothLeService
+import com.example.personeltracking2026.ui.settings.SettingsActivity
+import com.example.personeltracking2026.utils.DeviceIdentityManager
 import com.example.personeltracking2026.utils.drawableToBitmap
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.Dispatcher
+import me.relex.circleindicator.CircleIndicator3
 import org.json.JSONObject
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -48,6 +68,8 @@ import org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap
 import org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement
 import org.maplibre.android.style.layers.PropertyFactory.iconImage
 import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Point
 
 
 class PersonelActivity : BaseActivity() {
@@ -57,6 +79,7 @@ class PersonelActivity : BaseActivity() {
     private lateinit var sessionManager: SessionManager
     private lateinit var mapView: MapView
     private lateinit var pagerAdapter: TopPagerAdapter
+    private lateinit var reconnectManager: MqttReconnectManager
 
     private val viewModel: PersonelViewModel by viewModels {
         PersonelViewModel.Factory(
@@ -74,6 +97,11 @@ class PersonelActivity : BaseActivity() {
     private var currentLat = zoneCenterLat
     private var currentLon = zoneCenterLon
     private var mapLibreMap: org.maplibre.android.maps.MapLibreMap? = null
+    private var isLocationStarted = false
+    private var firstLocationReceived = false
+    private var geoJsonSource: GeoJsonSource? = null
+    private var lastAccepted: LocationData? = null
+    private val smoothWindow = ArrayDeque<LocationData>()
 
     // ─── SOS ─────────────────────────────────────────────────────────────────
     private var markerBlinkJob: Job? = null
@@ -129,6 +157,8 @@ class PersonelActivity : BaseActivity() {
         pagerAdapter = TopPagerAdapter()
         binding.viewPagerTop.adapter = pagerAdapter
 
+        binding.indicator?.setViewPager(binding.viewPagerTop)
+
         (binding.viewPagerTop.getChildAt(0) as RecyclerView)
             .itemAnimator = null
 
@@ -141,22 +171,41 @@ class PersonelActivity : BaseActivity() {
 
         binding.btnOverflow.setOnClickListener { showOverflowMenu(it) }
 
+        reconnectManager = MqttReconnectManager(this, viewModel.mqttManager)
+
         val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
             .getString("map_type", MapTypeManager.MapType.STANDARD.name)
 
-        currentMapType = MapTypeManager.MapType.valueOf(savedType!!)
+        val newType = MapTypeManager.MapType.values()
+            .firstOrNull { it.name == savedType }
+            ?: MapTypeManager.MapType.STANDARD
+
+        currentMapType = newType
 
         setupMap()
 
+        val deviceManager = DeviceIdentityManager(this)
+        val identity = deviceManager.getIdentity()
+
+        if (deviceManager.isAutoGenerated()) {
+            showSerialDialog()
+        }
+
         val app = application as App
+
+        app.currentMode = DeviceMode.RADIO
+
+        // FIX: SosManager di-init ulang di sini dengan locationProvider
+        // yang membaca koordinat dari App level (bukan hanya dari PersonelActivity)
+        // Ini memastikan SosManager selalu punya koordinat terbaru,
+        // bahkan saat SOS dipencet dari SettingsActivity
         SosManager.init(
             mqtt             = app.mqttManager,
             session          = sessionManager,
-            serial           = android.provider.Settings.Secure.getString(
-                contentResolver,
-                android.provider.Settings.Secure.ANDROID_ID
-            ) ?: "unknown",
-            locationProvider = { Pair(currentLat, currentLon) }
+            serial           = identity.serial,
+            id               = identity.androidId,
+            type             = SosManager.DeviceType.RADIO,
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
 
         binding.btnZoomIn.setOnClickListener {
@@ -174,24 +223,41 @@ class PersonelActivity : BaseActivity() {
         setupVitalSignsInitial()
         updateMqttUI()
         setupClickListeners()
+        setupSwipeRefresh()
         observeAllStates()
         loadPersonelData()
         requestLocationPermission()
     }
 
-    // FIX ANR: register battery receiver di onStart, bukan di ViewModel.init{}
     override fun onStart() {
         super.onStart()
 
         viewModel.registerBatteryReceiver(this)
         binding.mapView.onStart()
         updateMqttUI()
-        startLocationUpdates()
+
+        val granted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!granted) {
+            requestLocationPermission()
+            return
+        }
+        lifecycleScope.launch(Dispatchers.IO) {
+            reconnectManager.start()
+        }
+        lifecycleScope.launch {
+            startLocationUpdates()
+        }
     }
 
-    // FIX ANR: unregister battery receiver di onStop
     override fun onStop() {
         super.onStop()
+
+        viewModel.stopPublishing()
+
+        reconnectManager.stop()
 
         viewModel.unregisterBatteryReceiver(this)
         binding.mapView.onStop()
@@ -199,11 +265,15 @@ class PersonelActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
+        (application as App).currentMode = DeviceMode.RADIO
+        SessionManager(this).saveLastScreen(LastScreen.PERSONEL)
         binding.mapView.onResume()
         val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
             .getString("map_type", MapTypeManager.MapType.STANDARD.name)
 
-        val newType = MapTypeManager.MapType.valueOf(savedType!!)
+        val newType = MapTypeManager.MapType.values()
+            .firstOrNull { it.name == savedType }
+            ?: MapTypeManager.MapType.STANDARD
 
         if (newType != currentMapType) {
             currentMapType = newType
@@ -215,20 +285,28 @@ class PersonelActivity : BaseActivity() {
         )
 
         viewModel.updateInterval(interval)
-        // FIX ANR: hapus viewModel.refreshBattery() — sudah dihandle receiver
+
+        val app = application as App
+        val identity = DeviceIdentityManager(this).getIdentity() ?: return
+
+        SosManager.init(
+            mqtt             = app.mqttManager,
+            session          = sessionManager,
+            serial           = identity.serial,
+            id               = identity.androidId,
+            type             = SosManager.DeviceType.RADIO,
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
+        )
     }
 
     override fun onPause() {
         super.onPause()
         binding.mapView.onPause()
-        //handler.removeCallbacks(syncRunnable)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Pastikan blink berhenti dan SOS di-reset saat Activity destroy
         markerBlinkJob?.cancel()
-        //handler.removeCallbacks(syncRunnable)
         binding.mapView.onDestroy()
     }
 
@@ -244,7 +322,6 @@ class PersonelActivity : BaseActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
 
                 // SOS — khusus marker blink + publish MQTT
-                // Toolbar blink sudah dihandle BaseActivity
                 launch {
                     SosManager.isActive.collect { isActive ->
                         if (isActive) {
@@ -274,7 +351,22 @@ class PersonelActivity : BaseActivity() {
                         }
 
                         state.data?.let {
+                            if (!firstLocationReceived) {
+                                firstLocationReceived = true
+                            }
+                        }
+
+                        state.data?.let {
                             updateCoordinates(it.lat, it.lon)
+
+                            // FIX: Update koordinat ke App level
+                            // agar SosManager bisa baca koordinat terbaru
+                            // dari Activity manapun (termasuk SettingsActivity)
+                            val app = application as App
+                            app.currentLat      = it.lat
+                            app.currentLon      = it.lon
+                            app.currentAccuracy = it.accuracy
+
                             if (!SosManager.isActive.value) {
                                 updateMarker(it.lat, it.lon)
                             }
@@ -295,16 +387,21 @@ class PersonelActivity : BaseActivity() {
                     viewModel.personelState.collect { state ->
                         when (state) {
                             is PersonelState.Loading -> {
-                                pagerAdapter.name = "Loading..."
-                                pagerAdapter.nrp = ""
-                                pagerAdapter.rank = ""
-                                pagerAdapter.notifyItemChanged(0)
+                                binding.swipeRefresh?.isRefreshing = true
                             }
-                            is PersonelState.Success -> bindPersonelData(state.data)
+
+                            is PersonelState.Success -> {
+                                binding.swipeRefresh?.isRefreshing = false
+                                bindPersonelData(state.data)
+                            }
+
                             is PersonelState.Error -> {
+                                binding.swipeRefresh?.isRefreshing = false
+
                                 pagerAdapter.name = sessionManager.getName() ?: "-"
-                                pagerAdapter.nrp = sessionManager.getUsername() ?: "-"
-                                pagerAdapter.rank = sessionManager.getRank() ?: "-"
+                                pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
+                                pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+
                                 pagerAdapter.notifyItemChanged(0)
                             }
                         }
@@ -313,37 +410,73 @@ class PersonelActivity : BaseActivity() {
 
                 // Last sync
                 launch {
-                    var lastSyncTime = 0L
-
-                    // ambil update dari MQTT
-                    launch {
-                        viewModel.lastSyncTime.collect {
-                            lastSyncTime = it
-                        }
-                    }
-
-                    // timer UI tiap detik
                     while (true) {
+                        val lastSyncTime = viewModel.lastSyncTime.value
+
                         val diffSec = (System.currentTimeMillis() - lastSyncTime) / 1000
 
                         val (text, color) = when {
-                            diffSec < 2 -> "Just now" to "#69F0AE"
-                            diffSec < 60 -> "${diffSec}s ago" to "#69F0AE"
-                            diffSec < 300 -> "${diffSec / 60}m ago" to "#FFD740"
-                            else -> "${diffSec / 60}m ago" to "#FF5252"
+                            lastSyncTime == 0L -> "Belum sync"          to "#9E9E9E"
+                            diffSec < 2        -> "Just now"            to "#69F0AE"
+                            diffSec < 60       -> "${diffSec}s ago"     to "#69F0AE"
+                            diffSec < 300      -> "${diffSec / 60}m ago" to "#FFD740"
+                            else               -> "${diffSec / 60}m ago" to "#FF5252"
                         }
 
-                        pagerAdapter.lastSync = text
+                        pagerAdapter.lastSync    = text
                         pagerAdapter.statusColor = color
-                        pagerAdapter.notifyDataSetChanged()
+                        pagerAdapter.notifyItemChanged(0)
+                        pagerAdapter.notifyItemChanged(1)
+                        pagerAdapter.notifyItemChanged(2)
+
                         delay(1000)
                     }
                 }
 
                 // Heart rate dari BLE
                 launch {
-                    viewModel.heartRateState.collect { state ->
-                        updateHeartRate(state.bpm)
+                    launch {
+                        BluetoothLeService.connectionState.collect { state ->
+                            val isConnected = state == BluetoothLeService.ConnectionState.CONNECTED
+                            val deviceName  = BluetoothLeService.connectedDevice.value?.name ?: "--"
+
+                            pagerAdapter.bleConnected  = isConnected
+                            pagerAdapter.bleDeviceName = if (isConnected) deviceName else "--"
+                            pagerAdapter.notifyItemChanged(1)
+                        }
+                    }
+
+                    // Observe BPM realtime
+//                    launch {
+//                        BluetoothLeService.bpmValue.collect { bpm ->
+//                            val app = application as App
+//                            // simpan HR terbaru
+//                            app.currentHeartRate = bpm
+//                            app.currentHeartRateTs = System.currentTimeMillis()
+//                            // update ViewModel untuk MQTT
+//                            viewModel.updateHeartRate(
+//                                bpm = bpm,
+//                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
+//                            )
+//                        }
+//                    }
+
+                    // Refresh UI + cek expired
+                    launch {
+
+                        while (true) {
+                            val app = application as App
+                            val isExpired =
+                                System.currentTimeMillis() - app.currentHeartRateTs > 30_000
+                            val finalHr = if (isExpired) 0 else app.currentHeartRate
+                            pagerAdapter.bleBpm = finalHr
+                            pagerAdapter.notifyItemChanged(1)
+                            delay(1000)
+                        }
+                        BluetoothLeService.bpmValue.collect { bpm ->
+                            pagerAdapter.bleBpm = bpm
+                            pagerAdapter.notifyItemChanged(1)
+                        }
                     }
                 }
             }
@@ -357,9 +490,7 @@ class PersonelActivity : BaseActivity() {
         markerBlinkJob = lifecycleScope.launch {
             var toggle = false
             while (SosManager.isActive.value) {
-                val color = if (toggle) Color.parseColor("#FF1744")
-                else Color.parseColor("#FF8A80")
-                updateMarkerWithColor(color)
+                updateMarkerWithColor(toggle)
                 toggle = !toggle
                 delay(500)
             }
@@ -369,7 +500,7 @@ class PersonelActivity : BaseActivity() {
     private fun stopMarkerBlink() {
         markerBlinkJob?.cancel()
         markerBlinkJob = null
-        updateMarkerWithColor(Color.rgb(255, 82, 82))
+        updateMarkerWithColor(true)
     }
 
     // ─── PERSONEL ────────────────────────────────────────────────────────────
@@ -380,10 +511,46 @@ class PersonelActivity : BaseActivity() {
         viewModel.loadPersonelDetail(userId, token)
     }
 
+    private fun resolveCmsImageUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+
+        return if (path.startsWith("http://") || path.startsWith("https://")) {
+            path
+        } else {
+            "https://cms.aturwalpat.com/images/${path.trimStart('/')}"
+        }
+    }
+
     private fun bindPersonelData(data: PersonelData) {
-        pagerAdapter.name = sessionManager.getName() ?: "-"
-        pagerAdapter.nrp = sessionManager.getUsername() ?: "-"
-        pagerAdapter.rank = sessionManager.getRank() ?: "-"
+        val avatarFromApi = resolveCmsImageUrl(data.avatar_url ?: data.image)
+        val avatarFromSession = sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
+
+        val finalAvatar = avatarFromApi ?: avatarFromSession
+
+        Log.d("AVATAR_CHECK", "avatarFromApi = $avatarFromApi")
+        Log.d("AVATAR_CHECK", "avatarFromSession = $avatarFromSession")
+        Log.d("AVATAR_CHECK", "finalAvatar = $finalAvatar")
+
+        pagerAdapter.avatarUrl = finalAvatar
+
+        finalAvatar?.let {
+            sessionManager.saveAvatar(it)
+        }
+
+        val finalName = data.full_name
+            ?: data.name
+            ?: sessionManager.getName()
+            ?: "-"
+
+        pagerAdapter.name = finalName
+        sessionManager.saveName(finalName)
+
+        pagerAdapter.nrp = data.nrp
+            ?: sessionManager.getNrp().ifBlank { "-" }
+
+        pagerAdapter.rank = data.rank?.name
+            ?: sessionManager.getRank().ifBlank { "-" }
+
         pagerAdapter.notifyItemChanged(0)
     }
 
@@ -396,19 +563,52 @@ class PersonelActivity : BaseActivity() {
         val dialog = BottomSheetDialog(this)
         val view = layoutInflater.inflate(R.layout.bottom_sheet_personel, null)
 
-        // ambil data dari ViewModel
-        val name = sessionManager.getName() ?: "-"
-        val nrp  = sessionManager.getUsername() ?: "-"
         val personel = (viewModel.personelState.value as? PersonelState.Success)?.data
-        val location = viewModel.locationState.value.data
 
-        // SET DATA
-        view.findViewById<TextView>(R.id.tvName).text = name
-        view.findViewById<TextView>(R.id.tvNRP).text = nrp
-        view.findViewById<TextView>(R.id.tvRank).text = personel?.rank?.name ?: "-"
-        view.findViewById<TextView>(R.id.tvUnit).text = personel?.unit?.name ?: "-"
-        view.findViewById<TextView>(R.id.tvSquad).text = personel?.regu?.name ?: "-"
-        view.findViewById<TextView>(R.id.tvPersonelStatus).text = "Active"
+        val name = personel?.full_name
+            ?: personel?.name
+            ?: sessionManager.getName()
+            ?: "-"
+
+        val nrp = personel?.nrp?.takeIf { it.isNotBlank() }
+            ?: sessionManager.getNrp().ifBlank { "-" }
+
+        // Ambil dari classification dulu, fallback ke field langsung, fallback ke session
+        val rank = personel.getClassification("Rank")
+            .ifBlank { personel?.rank?.name ?: "" }
+            .ifBlank { sessionManager.getRank() }
+            .ifBlank { "-" }
+
+        val unit = personel.getClassification("Unit")
+            .ifBlank { personel?.unit?.name ?: "" }
+            .ifBlank { sessionManager.getUnit() }
+            .ifBlank { "-" }
+
+        val regu = personel.getClassification("Regu")
+            .ifBlank { personel?.regu?.name ?: "" }
+            .ifBlank { sessionManager.getRegu() }
+            .ifBlank { "-" }
+
+        view.findViewById<TextView>(R.id.tvName).text  = name
+        view.findViewById<TextView>(R.id.tvNRP).text   = nrp
+        view.findViewById<TextView>(R.id.tvRank).text  = rank
+        view.findViewById<TextView>(R.id.tvUnit).text  = unit
+        view.findViewById<TextView>(R.id.tvSquad).text = regu
+
+        val avatarUrl = resolveCmsImageUrl(personel?.avatar_url ?: personel?.image)
+            ?: sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
+
+        val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
+        if (!avatarUrl.isNullOrBlank()) {
+            Glide.with(this)
+                .load(avatarUrl)
+                .placeholder(R.drawable.ic_avatar)
+                .error(R.drawable.ic_avatar)
+                .dontAnimate()
+                .into(imgProfile)
+        } else {
+            imgProfile.setImageResource(R.drawable.ic_avatar)
+        }
 
         dialog.setContentView(view)
         dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
@@ -418,8 +618,6 @@ class PersonelActivity : BaseActivity() {
     // ─── MAP ─────────────────────────────────────────────────────────────────
 
     private fun setupMap() {
-        MapLibre.getInstance(this)
-
         mapView = binding.mapView
         mapView.onCreate(null)
 
@@ -437,103 +635,60 @@ class PersonelActivity : BaseActivity() {
                     .zoom(15.0)
                     .build()
 
-                updateMarker(currentLat, currentLon)
-            }
-        }
-    }
+                val style = it
 
-    private fun updateMarker(lat: Double, lon: Double) {
-        val map = mapLibreMap ?: return
-        val point = org.maplibre.android.geometry.LatLng(lat, lon)
-        val geoJsonSource = org.maplibre.android.style.sources.GeoJsonSource(
-            "personel-source",
-            org.maplibre.geojson.Point.fromLngLat(lon, lat)
-        )
+                geoJsonSource = GeoJsonSource(
+                    "personel-source",
+                    Point.fromLngLat(currentLon, currentLat)
+                )
+                style.addSource(geoJsonSource!!)
 
-        map.style?.apply {
+                val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+                drawableRed.setTint(Color.parseColor("#FF1744"))
+                val bitmapRed = drawableToBitmap(drawableRed)
 
-            getLayer("personel-layer")?.let { removeLayer(it) }
-            getSource("personel-source")?.let { removeSource(it) }
+                style.addImage("marker-red", bitmapRed)
 
-            addSource(geoJsonSource)
-            // AMBIL drawable
-            val drawable = ContextCompat.getDrawable(this@PersonelActivity, R.drawable.ic_location_pin)
-                ?: return  // kalau null, stop biar gak crash
+                val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+                drawablePink.setTint(Color.parseColor("#FF8A80"))
+                val bitmapPink = drawableToBitmap(drawablePink)
 
-            drawable.setTint(Color.rgb(255, 82, 82))
+                style.addImage("marker-pink", bitmapPink)
 
-            val bitmap = drawableToBitmap(drawable)
-
-            // addImage HARUS sebelum layer
-            addImage("marker-icon", bitmap)
-
-            val symbolLayer = SymbolLayer(
-                "personel-layer",
-                "personel-source"
-            ).withProperties(
-                iconImage("marker-icon"),
-                iconAllowOverlap(true),
-                iconIgnorePlacement(true)
-            )
-
-            addLayer(symbolLayer)
-        }
-
-        map.animateCamera(
-            org.maplibre.android.camera.CameraUpdateFactory.newLatLng(point)
-        )
-    }
-
-    private fun updateMarkerWithColor(tintColor: Int) {
-        val map = mapLibreMap ?: return
-
-        val geoJsonSource = org.maplibre.android.style.sources.GeoJsonSource(
-            "personel-source",
-            org.maplibre.geojson.Point.fromLngLat(currentLon, currentLat)
-        )
-
-        map.style?.apply {
-            getLayer("personel-layer")?.let { removeLayer(it) }
-            getSource("personel-source")?.let { removeSource(it) }
-
-            addSource(geoJsonSource)
-
-            val drawable = ContextCompat.getDrawable(
-                this@PersonelActivity, R.drawable.ic_location_pin
-            ) ?: return
-
-            drawable.setTint(tintColor)
-            addImage("marker-icon", drawableToBitmap(drawable))
-
-            addLayer(
-                SymbolLayer("personel-layer", "personel-source")
+                val symbolLayer = SymbolLayer("personel-layer", "personel-source")
                     .withProperties(
-                        iconImage("marker-icon"),
+                        iconImage("marker-red"),
                         iconAllowOverlap(true),
                         iconIgnorePlacement(true)
                     )
+                style.addLayer(symbolLayer)
+            }
+        }
+        Log.d("INIT", "MAP READY")
+    }
+
+    private fun updateMarker(lat: Double, lon: Double) {
+        geoJsonSource?.setGeoJson(
+            Point.fromLngLat(lon, lat)
+        )
+
+        val newLoc = LocationData(lat, lon, 0f, "")
+        val last = lastAccepted
+
+        if (last == null || distance(last, newLoc) > 5) {
+            mapLibreMap?.moveCamera(
+                CameraUpdateFactory.newLatLng(LatLng(lat, lon))
             )
+            lastAccepted = newLoc
         }
     }
 
-    private fun showMapTypeMenu() {
-        val wrapper = android.view.ContextThemeWrapper(this, R.style.DarkPopupMenu)
-        val popup   = android.widget.PopupMenu(wrapper, binding.btnMapType)
-        MapTypeManager.MapType.values().forEach { popup.menu.add(it.label) }
-        popup.setOnMenuItemClickListener { item ->
-            MapTypeManager.MapType.values()
-                .firstOrNull { it.label == item.title.toString() }
-                ?.let {
-                    currentMapType = it
-                    applyMapType(it)
+    private fun updateMarkerWithColor(useRed: Boolean) {
+        val layer = mapLibreMap?.style?.getLayer("personel-layer") as? SymbolLayer
 
-                    getSharedPreferences("map_settings", MODE_PRIVATE).edit {
-                        putString("map_type", it.name)
-                    }
-                }
-            true
-        }
-        popup.show()
+        layer?.setProperties(
+            iconImage(if (useRed) "marker-red" else "marker-pink")
+        )
     }
 
     private fun updateCoordinates(lat: Double, lon: Double) {
@@ -547,19 +702,37 @@ class PersonelActivity : BaseActivity() {
     private fun applyMapType(type: MapTypeManager.MapType) {
         val map = mapLibreMap ?: return
 
-        // IMPAN posisi kamera sekarang
         val currentCamera = map.cameraPosition
-
         val styleUrl = MapTypeManager.getStyleUrl(type)
 
         map.setStyle(
             Style.Builder().fromUri(styleUrl)
-        ) {
-            // RESTORE kamera
+        ) { style ->
+
             map.cameraPosition = currentCamera
 
-            // Tambahin marker lagi
-            updateMarker(currentLat, currentLon)
+            geoJsonSource = GeoJsonSource(
+                "personel-source",
+                Point.fromLngLat(currentLon, currentLat)
+            )
+            style.addSource(geoJsonSource!!)
+
+            val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+            drawableRed.setTint(Color.parseColor("#FF1744"))
+            style.addImage("marker-red", drawableToBitmap(drawableRed))
+
+            val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+            drawablePink.setTint(Color.parseColor("#FF8A80"))
+            style.addImage("marker-pink", drawableToBitmap(drawablePink))
+
+            val symbolLayer = SymbolLayer("personel-layer", "personel-source")
+                .withProperties(
+                    iconImage("marker-red"),
+                    iconAllowOverlap(true),
+                    iconIgnorePlacement(true)
+                )
+
+            style.addLayer(symbolLayer)
         }
     }
 
@@ -570,15 +743,23 @@ class PersonelActivity : BaseActivity() {
             this, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
 
-        if (granted)
-            //startLocationUpdates()
-        else locationPermissionRequest.launch(
-            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-        )
+        if (!granted) {
+            locationPermissionRequest.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
     }
 
     private fun startLocationUpdates() {
+        if (isLocationStarted) return
+
+        isLocationStarted = true
+
         viewModel.startLocationUpdates(2000)
+        Log.d("INIT", "START GPS")
     }
 
     private fun parseIntervalToMs(interval: String): Long {
@@ -595,6 +776,16 @@ class PersonelActivity : BaseActivity() {
         }
     }
 
+    private fun distance(a: LocationData, b: LocationData): Float {
+        val results = FloatArray(1)
+        android.location.Location.distanceBetween(
+            a.lat, a.lon,
+            b.lat, b.lon,
+            results
+        )
+        return results[0]
+    }
+
     // ─── VITAL SIGNS UI ──────────────────────────────────────────────────────
 
     private fun setupVitalSignsInitial() {
@@ -606,7 +797,7 @@ class PersonelActivity : BaseActivity() {
         pagerAdapter.notifyItemChanged(1)
     }
 
-    // ─── UPDATE MQTT ────────────────────────────────────────────────────────────
+    // ─── UPDATE MQTT ─────────────────────────────────────────────────────────
 
     private fun updateMqttUI() {
         val config = MqttConfigManager(this).load()
@@ -630,11 +821,40 @@ class PersonelActivity : BaseActivity() {
 
             startActivity(intent)
         }
-//        binding.btnUbahInterval.setOnClickListener {
-//            startActivity(Intent(this, SettingsActivity::class.java))
-//        }
-        binding.btnMapType.setOnClickListener {
-            showMapTypeMenu()
+    }
+
+    // ─── SWIPE REFRESH ───────────────────────────────────────────────────────
+
+    private fun setupSwipeRefresh() {
+        binding.swipeRefresh?.setOnRefreshListener {
+            Log.d("SWIPE_REFRESH", "Manual refresh triggered")
+            loadPersonelData()
         }
+    }
+
+    // ─── SERIAL NUMBER DIALOG ────────────────────────────────────────────────
+
+    private fun showSerialDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_serial_req, null)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        val btnLater = dialogView.findViewById<Button>(R.id.btnLater)
+        val btnSetting = dialogView.findViewById<Button>(R.id.btnGoToSetting)
+
+        btnLater.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnSetting.setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 }

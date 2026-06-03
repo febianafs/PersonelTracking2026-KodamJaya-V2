@@ -37,7 +37,7 @@
                         android:layout_width="56dp"
                         android:layout_height="56dp"
                         android:scaleType="centerCrop"
-                        android:src="@drawable/ic_launcher_background"
+                        android:src="@drawable/ic_avatar"
                         android:background="#0D2138"/>
 
                     <androidx.constraintlayout.widget.ConstraintLayout
@@ -46,12 +46,12 @@
                         android:layout_weight="1"
                         android:layout_marginStart="12dp">
 
-                        <androidx.constraintlayout.widget.Guideline
-                            android:id="@+id/guidelineMid"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="vertical"
-                            app:layout_constraintGuide_percent="0.4" />
+<!--                        <androidx.constraintlayout.widget.Guideline-->
+<!--                            android:id="@+id/guidelineMid"-->
+<!--                            android:layout_width="wrap_content"-->
+<!--                            android:layout_height="wrap_content"-->
+<!--                            android:orientation="vertical"-->
+<!--                            app:layout_constraintGuide_percent="0.4" />-->
 
                         <!-- DISPLAY BATTERY -->
                         <TextView
@@ -88,8 +88,7 @@
                             android:textColor="#FFFFFF"
                             android:textSize="14sp"
                             android:textStyle="bold"
-
-                            app:layout_constraintEnd_toStartOf="@+id/guidelineMid"
+                            app:layout_constraintEnd_toStartOf="@+id/tvBattery"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toTopOf="parent" />
 
@@ -101,8 +100,6 @@
                             android:textColor="#90CAF9"
                             android:textSize="11sp"
                             android:layout_marginTop="5dp"
-
-                            app:layout_constraintEnd_toStartOf="@+id/guidelineMid"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toBottomOf="@id/tvName" />
 
@@ -111,69 +108,68 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
-                            android:text="Pangkat"
+                            android:text="Rank"
                             android:textColor="#FFFFFF"
                             android:textSize="11sp"
                             android:layout_marginTop="5dp"
-
-                            app:layout_constraintEnd_toStartOf="@+id/guidelineMid"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintTop_toBottomOf="@id/tvNRP" />
 
-                        <!-- LATITUDE + LONGITUDE + BPM CATEGORY -->
-                        <TextView
-                            android:id="@+id/tvLat"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:text="Lat : -7.868729"
-                            android:textColor="#FFFFFF"
-                            android:textSize="11sp"
+<!--                        &lt;!&ndash; LATITUDE + LONGITUDE + BPM CATEGORY &ndash;&gt;-->
+<!--                        <TextView-->
+<!--                            android:id="@+id/tvLat"-->
+<!--                            android:layout_width="0dp"-->
+<!--                            android:layout_height="wrap_content"-->
+<!--                            android:text="Lat : -7.868729"-->
+<!--                            android:textColor="#FFFFFF"-->
+<!--                            android:textSize="11sp"-->
 
-                            app:layout_constraintStart_toStartOf="@id/guidelineMid"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toTopOf="parent"/>
+<!--                            app:layout_constraintStart_toStartOf="@id/guidelineMid"-->
+<!--                            app:layout_constraintEnd_toEndOf="parent"-->
+<!--                            app:layout_constraintTop_toTopOf="parent"/>-->
 
-                        <TextView
-                            android:id="@+id/tvLon"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:text="Long : 105.643117"
-                            android:textColor="#FFFFFF"
-                            android:textSize="11sp"
-                            android:layout_marginTop="5dp"
+<!--                        <TextView-->
+<!--                            android:id="@+id/tvLon"-->
+<!--                            android:layout_width="0dp"-->
+<!--                            android:layout_height="wrap_content"-->
+<!--                            android:text="Long : 105.643117"-->
+<!--                            android:textColor="#FFFFFF"-->
+<!--                            android:textSize="11sp"-->
+<!--                            android:layout_marginTop="5dp"-->
 
-                            app:layout_constraintStart_toStartOf="@id/guidelineMid"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvLat"/>
+<!--                            app:layout_constraintStart_toStartOf="@id/guidelineMid"-->
+<!--                            app:layout_constraintEnd_toEndOf="parent"-->
+<!--                            app:layout_constraintTop_toBottomOf="@id/tvLat"/>-->
 
-                        <TextView
-                            android:id="@+id/tvBpmCategory"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:text="HR : Normal"
-                            android:textColor="#69F0AE"
-                            android:textSize="11sp"
-                            android:layout_marginTop="5dp"
+<!--                        <TextView-->
+<!--                            android:id="@+id/tvBpmCategory"-->
+<!--                            android:layout_width="0dp"-->
+<!--                            android:layout_height="wrap_content"-->
+<!--                            android:text="HR : Normal"-->
+<!--                            android:textColor="#69F0AE"-->
+<!--                            android:textSize="11sp"-->
+<!--                            android:layout_marginTop="5dp"-->
 
-                            app:layout_constraintStart_toStartOf="@id/guidelineMid"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/tvLon"/>
+<!--                            app:layout_constraintStart_toStartOf="@id/guidelineMid"-->
+<!--                            app:layout_constraintEnd_toEndOf="parent"-->
+<!--                            app:layout_constraintTop_toBottomOf="@id/tvLon"/>-->
 
                         <!-- FULL DATA BUTTON -->
                         <TextView
                             android:id="@+id/btnDataSelengkapnya"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="View full data ›"
-                            android:textColor="@color/primary"
-                            android:textSize="11sp"
+                            android:layout_gravity="end|center"
+                            android:layout_marginTop="28dp"
+                            android:background="?attr/selectableItemBackground"
                             android:clickable="true"
                             android:focusable="true"
-                            android:layout_gravity="end|center"
-                            android:background="?attr/selectableItemBackground"
+                            android:text="View full data ›"
+                            android:textColor="@color/primary"
 
+                            android:textSize="13sp"
                             app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toBottomOf="@+id/tvBpmCategory"/>
+                            app:layout_constraintTop_toBottomOf="@+id/tvBattery" />
                     </androidx.constraintlayout.widget.ConstraintLayout>
 
                     <!--                    <ImageButton-->

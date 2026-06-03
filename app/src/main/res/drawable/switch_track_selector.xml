@@ -1,0 +1,11 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ON -->
+    <item android:state_checked="true"
+        android:color="#3322C7FF"/> <!-- cyan transparan -->
+
+    <!-- OFF -->
+    <item
+        android:color="#33FFFFFF"/> <!-- abu transparan -->
+
+</selector>

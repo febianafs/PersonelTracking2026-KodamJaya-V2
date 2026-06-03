@@ -12,13 +12,16 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.Rational
+import android.view.ContextThemeWrapper
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -29,17 +32,22 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
+import com.example.personeltracking2026.core.navigation.LastScreen
+import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.sos.SosManager
 import com.example.personeltracking2026.data.repository.BodycamRepository
 import com.example.personeltracking2026.databinding.ActivityBodycamBinding
 import com.example.personeltracking2026.ui.login.LoginActivity
+import com.example.personeltracking2026.ui.settings.SettingsActivity
 import com.pedro.common.ConnectChecker
 import com.pedro.encoder.input.video.CameraHelper
 import com.pedro.library.rtmp.RtmpCamera2
 import com.pedro.library.view.OpenGlView
 import kotlinx.coroutines.launch
-import com.example.personeltracking2026.utils.DeviceIdProvider
+import com.example.personeltracking2026.utils.DeviceIdentityManager
+import com.example.personeltracking2026.core.device.DeviceMode
+import com.example.personeltracking2026.core.service.MqttLocationService
 
 class BodycamActivity : BaseActivity(), ConnectChecker {
 
@@ -57,6 +65,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     private var originalRadius: Float = 0f
     private var originalElevation: Float = 0f
     private var originalMargins: ViewGroup.MarginLayoutParams? = null
+    private var hasPublishedStreamStart = false
     private lateinit var sessionManager: SessionManager
 
     // Stream resolution option
@@ -66,28 +75,26 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val RESOLUTION_HD = Pair(1280, 720)
     }
 
-    // Gabung RTMP Url + Device serial number
-    fun getRtmpUrl(serial: String): String {
-        return "rtmp://76.13.20.253:11935/personel/$serial"
-    }
-
-
     // ─────────────────────────────────────────────
     //  ConnectChecker callbacks
     // ─────────────────────────────────────────────
 
-    override fun onConnectionStarted(url: String) {}
+    override fun onConnectionStarted(url: String) {
+        Log.d("RTMP_DEBUG", "onConnectionStarted: $url")
+    }
 
     override fun onConnectionSuccess() {
+        Log.d("RTMP_DEBUG", "onConnectionSuccess")
         runOnUiThread {
-            Toast.makeText(this, "Stream terhubung", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Stream connected", Toast.LENGTH_SHORT).show()
         }
     }
 
     override fun onConnectionFailed(reason: String) {
+        Log.e("RTMP_DEBUG", "onConnectionFailed: $reason")
         // SARAN 4: restart preview setelah koneksi gagal
         runOnUiThread {
-            Toast.makeText(this, "Koneksi gagal: $reason", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Connection failed: $reason", Toast.LENGTH_SHORT).show()
             viewModel.stopStream()
             startCameraPreview()
         }
@@ -96,8 +103,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     override fun onNewBitrate(bitrate: Long) {}
 
     override fun onDisconnect() {
+        Log.w("RTMP_DEBUG", "onDisconnect")
         runOnUiThread {
-            Toast.makeText(this, "Stream terputus", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Stream disconnected", Toast.LENGTH_SHORT).show()
             // Auto stop stream di ViewModel saat disconnect tak terduga
             if (viewModel.isLive()) viewModel.stopStream()
         }
@@ -123,8 +131,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
         when {
             cameraGranted && audioGranted -> startCameraPreview()
-            !cameraGranted -> Toast.makeText(this, "Izin kamera diperlukan", Toast.LENGTH_SHORT).show()
-            !audioGranted -> Toast.makeText(this, "Izin mikrofon diperlukan", Toast.LENGTH_SHORT).show()
+            !cameraGranted -> Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show()
+            !audioGranted -> Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -139,18 +147,29 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         requestBatteryOptimizationExemption()
 
-        // Cek Device Serial Number
-        val deviceId = DeviceIdProvider.getDeviceId(this)
-        Log.d("DEVICE_ID", deviceId)
+        val deviceManager = DeviceIdentityManager(this)
+        val identity = deviceManager.getIdentity()
+
+        if (deviceManager.isAutoGenerated()) {
+            showSerialDialog()
+        }
+
+        val serial = identity.serial
+        val androidId = identity.androidId
 
         sessionManager = SessionManager(this)
 
         val app = application as App
+        app.currentMode = DeviceMode.BODYCAM
+        Log.d("DEVICE_MODE", "BodycamActivity onCreate -> BODYCAM")
+
         SosManager.init(
             mqtt             = app.mqttManager,
             session          = sessionManager,
-            serial           = DeviceIdProvider.getDeviceId(this),
-            locationProvider = { Pair(0.0, 0.0) }
+            serial           = serial,
+            id               = androidId,
+            type             = SosManager.DeviceType.BODYCAM,
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
 
         WindowCompat.setDecorFitsSystemWindows(window, true)
@@ -195,11 +214,31 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     }
 
     override fun onResume() {
+        Log.d("RTMP_DEBUG", "onResume")
         super.onResume()
-        // SARAN 1: cek isSurfaceReady sebelum startPreview
+
+        val app = application as App
+        app.currentMode = DeviceMode.BODYCAM
+        Log.d("DEVICE_MODE", "BodycamActivity onResume -> BODYCAM")
+
+        SessionManager(this).saveLastScreen(LastScreen.BODYCAM)
+
+        val identity = DeviceIdentityManager(this).getIdentity() ?: return
+
+        SosManager.init(
+            mqtt             = app.mqttManager,
+            session          = sessionManager,
+            serial           = identity.serial,
+            id               = identity.androidId,
+            type             = SosManager.DeviceType.BODYCAM,
+            locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
+        )
+
         if (!isSurfaceReady) return
         if (isInPictureInPictureMode) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+
+        if (
+            ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED && isCameraEnabled
         ) {
             startCameraPreview()
@@ -207,6 +246,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     }
 
     override fun onPause() {
+        Log.d("RTMP_DEBUG", "onPause isPip=$isInPictureInPictureMode")
         super.onPause()
         // Hentikan stream sebelum pause
         // if (viewModel.isLive()) viewModel.stopStream()
@@ -219,6 +259,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     }
 
     override fun onDestroy() {
+        Log.d("RTMP_DEBUG", "onDestroy")
         super.onDestroy()
         // SARAN 8: reset isSurfaceReady saat destroy
         isSurfaceReady = false
@@ -265,6 +306,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     // ─────────────────────────────────────────────
 
     private fun startCameraPreview() {
+        if (rtmpCamera.isStreaming) return
         if (!isSurfaceReady) return
         if (!hasCameraPermission()) {
             permissionLauncher.launch(
@@ -279,11 +321,17 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                 rtmpCamera.stopPreview()
             }
 
-            rtmpCamera.startPreview(CameraHelper.Facing.BACK, res.first, res.second)
+            Log.d(
+                "RTMP_DEBUG",
+                "startPreview width=${res.first}, height=${res.second}"
+            )
+            rtmpCamera.startPreview(CameraHelper.Facing.BACK,
+                res.first,
+                res.second)
             binding.layoutIdle?.visibility = View.GONE
             binding.surfaceView?.visibility = View.VISIBLE
         } catch (e: Exception) {
-            Toast.makeText(this, "Gagal membuka kamera: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Could not open camera: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -302,10 +350,17 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     // ─────────────────────────────────────────────
 
     private fun startRtmpStream() {
-        val serial = DeviceIdProvider.getDeviceId(this)
-        val url = getRtmpUrl(serial)
+        val deviceManager = DeviceIdentityManager(this)
+        val identity = deviceManager.getIdentity()
+
+        if (deviceManager.isAutoGenerated()) {
+            showSerialDialog()
+        }
+
+        val serial = identity.serial
+        val url = StreamUtils.getRtmpUrl(serial)
         if (!hasAudioPermission()) {
-            Toast.makeText(this, "Izin mikrofon diperlukan", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
             viewModel.stopStream()
             return
         }
@@ -321,6 +376,10 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         }
 
         try {
+            Log.d(
+                "RTMP_DEBUG",
+                "prepareVideo width=${res.second}, height=${res.first}, bitrate=$videoBitrate"
+            )
             // SARAN 7: bungkus dengan try-catch
             val prepared = rtmpCamera.prepareAudio(
                 96 * 1024,
@@ -335,12 +394,15 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             )
 
             if (prepared) {
+                Log.d("RTMP_DEBUG", "prepare success")
                 //rtmpCamera.startStream(url)
                 Handler(Looper.getMainLooper()).postDelayed({
+                    Log.d("RTMP_DEBUG", "startStream called")
                     rtmpCamera.startStream(url)
                 }, 400)
             } else {
-                Toast.makeText(this, "Gagal mempersiapkan stream", Toast.LENGTH_SHORT).show()
+                Log.e("RTMP_DEBUG", "prepare failed")
+                Toast.makeText(this, "Unable to setup stream", Toast.LENGTH_SHORT).show()
                 viewModel.stopStream()
             }
         } catch (e: Exception) {
@@ -350,6 +412,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     }
 
     private fun stopRtmpStream() {
+        Log.d("RTMP_DEBUG", "stopRtmpStream")
         // SARAN 5: cek isStreaming dulu sebelum stop
         if (::rtmpCamera.isInitialized && rtmpCamera.isStreaming) {
             rtmpCamera.stopStream()
@@ -362,6 +425,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     private fun toggleMic() {
         isMicEnabled = !isMicEnabled
+        Log.d("RTMP_DEBUG", "Mic enabled = $isMicEnabled")
         if (isMicEnabled) rtmpCamera.enableAudio() else rtmpCamera.disableAudio()
         binding.btnMic?.setImageResource(
             if (isMicEnabled) R.drawable.ic_mic else R.drawable.ic_mic_off
@@ -369,7 +433,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         binding.btnMic?.alpha = if (isMicEnabled) 1f else 0.5f
         Toast.makeText(
             this,
-            if (isMicEnabled) "Mikrofon aktif" else "Mikrofon mati",
+            if (isMicEnabled) "Microphone active" else "Microphone inactive",
             Toast.LENGTH_SHORT
         ).show()
     }
@@ -380,6 +444,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     private fun toggleCamera() {
         isCameraEnabled = !isCameraEnabled
+        Log.d("RTMP_DEBUG", "Camera enabled = $isCameraEnabled")
         if (isCameraEnabled) {
             binding.btnVideo?.setImageResource(R.drawable.ic_cam)
             binding.btnVideo?.alpha = 1f
@@ -406,6 +471,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         binding.btnSd?.setOnClickListener {
             if (!viewModel.isLive()) {
+                Log.d("RTMP_DEBUG", "Resolution changed to SD")
                 viewModel.setResolution(false)
                 updateResolutionUi(false)
                 restartPreviewWithResolution()
@@ -414,6 +480,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         binding.btnHd?.setOnClickListener {
             if (!viewModel.isLive()) {
+                Log.d("RTMP_DEBUG", "Resolution changed to HD")
                 viewModel.setResolution(true)
                 updateResolutionUi(true)
                 restartPreviewWithResolution()
@@ -514,6 +581,10 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             }
             is StreamState.Live -> {
                 startRtmpStream()
+
+                hasPublishedStreamStart = true
+                publishBodycamStream(1)
+
                 binding.layoutIdle?.visibility = View.GONE
                 binding.layoutEnded?.visibility = View.GONE
                 binding.liveIndicator?.visibility = View.VISIBLE
@@ -524,7 +595,12 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             is StreamState.Ended -> {
                 stopRtmpStream()
 
+                if (hasPublishedStreamStart) {
+                    publishBodycamStream(0)
+                }
+
                 stopCameraPreview()
+                hasPublishedStreamStart = false
 
                 binding.surfaceView?.visibility = View.GONE
                 binding.layoutIdle?.visibility = View.GONE
@@ -547,25 +623,33 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     }
 
     private fun showBodycamMenu(anchor: View) {
-        PopupMenu(this, anchor).apply {
-            menuInflater.inflate(R.menu.menu_bodycam, menu)
-            setOnMenuItemClickListener { item ->
-//                when (item.itemId) {
-//                    R.id.menu_settings -> {
-//                        Toast.makeText(this@BodycamActivity, "Settings", Toast.LENGTH_SHORT).show()
-//                        true
-//                    }
-//                    else -> false
-//                }
+        val wrapper = ContextThemeWrapper(this, R.style.DarkPopupMenu)
 
+        PopupMenu(wrapper, anchor).apply {
+            menuInflater.inflate(R.menu.menu_bodycam, menu)
+
+            setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    R.id.back_to_login -> {
-                        logoutToLogin()
+                    R.id.action_ht -> {
+
+                        (application as App).currentMode = DeviceMode.RADIO
+
+                        val intent = Intent(this@BodycamActivity, com.example.personeltracking2026.ui.personel.PersonelActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        startActivity(intent)
+                        finish()
                         true
                     }
+
+                    R.id.action_logout -> {
+                        showLogoutConfirmation()
+                        true
+                    }
+
                     else -> false
                 }
             }
+
             show()
         }
     }
@@ -575,6 +659,15 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     // ─────────────────────────────────────────────
 
     private fun logoutToLogin() {
+
+        val app = application as App
+
+        app.currentMode = DeviceMode.NONE
+
+        MqttLocationService.stopService(this)
+
+        app.mqttManager.disconnect()
+
         sessionManager.clearSession()
 
         val intent = Intent(this, LoginActivity::class.java)
@@ -611,7 +704,11 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
 
+        Log.d("RTMP_DEBUG", "PiP mode = $isInPictureInPictureMode")
+
         if (isInPictureInPictureMode) {
+
+            Log.d("RTMP_DEBUG", "ENTER PiP MODE")
 
             binding.pipOverlay?.visibility = View.VISIBLE
             binding.pipOverlay?.alpha = 1f
@@ -660,6 +757,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             binding.liveIndicator.visibility = View.GONE
         } else {
 
+            Log.d("RTMP_DEBUG", "EXIT PiP MODE")
+
             // Balikin card effect ke semula
             binding.cameraCard.radius = originalRadius
             binding.cameraCard.cardElevation = originalElevation
@@ -676,5 +775,56 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             binding.imgChart?.visibility = View.VISIBLE
             binding.liveIndicator.visibility = View.VISIBLE
         }
+    }
+
+    // ─────────────────────────────────────────────
+    //  PUBLISH DATA PAYLOAD
+    // ─────────────────────────────────────────────
+
+    private fun publishBodycamStream(stream: Int) {
+        val app = application as App
+        val identity = DeviceIdentityManager(this).getIdentity() ?: return
+
+        val serial = identity.serial
+        val androidId = identity.androidId
+        val streamUrl = StreamUtils.getRtmpUrl(serial)
+
+        val payload = MqttPayloadBuilder.buildBodycamDataPayload(
+            session = sessionManager,
+            serialNumber = serial,
+            androidId = androidId,
+            streamUrl = streamUrl,
+            stream = stream
+        )
+
+        app.mqttManager.publishBodycamData(payload)
+    }
+
+    // ─────────────────────────────────────────────
+    //  SERIAL NUMBER DIALOG
+    // ─────────────────────────────────────────────
+
+    private fun showSerialDialog() {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_serial_req, null)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        val btnLater = dialogView.findViewById<Button>(R.id.btnLater)
+        val btnSetting = dialogView.findViewById<Button>(R.id.btnGoToSetting)
+
+        btnLater.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        btnSetting.setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+        dialog.show()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
     }
 }

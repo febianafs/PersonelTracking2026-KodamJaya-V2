@@ -19,7 +19,7 @@ class LoginViewModel(
 
     fun login(username: String, password: String) {
         if (username.isBlank() || password.isBlank()) {
-            _loginState.value = Result.Error("Username dan password tidak boleh kosong")
+            _loginState.value = Result.Error("Username and password are required")
             return
         }
         viewModelScope.launch {

@@ -14,14 +14,14 @@ class LoginRepository {
                 Result.Success(response.body()!!)
             } else {
                 val errorMsg = when (response.code()) {
-                    400 -> "Request tidak valid"
-                    401 -> "Username atau password salah"
-                    else -> "Terjadi kesalahan: ${response.code()}"
+                    400 -> "Invalid request"
+                    401 -> "Invalid email or password"
+                    else -> "An error occurred: ${response.code()}"
                 }
                 Result.Error(errorMsg)
             }
         } catch (e: Exception) {
-            Result.Error("Tidak dapat terhubung ke server")
+            Result.Error("Network unavailable. Please check your connection.")
         }
     }
 }

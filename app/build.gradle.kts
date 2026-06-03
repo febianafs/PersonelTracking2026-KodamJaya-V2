@@ -12,8 +12,9 @@ android {
         applicationId = "com.example.personeltracking2026"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
+        buildConfigField("String", "APP_VERSION", "\"1.0.1\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -89,6 +90,11 @@ dependencies {
     // MQTT
     implementation("com.hivemq:hivemq-mqtt-client:1.3.3")
 
+    // AUTO UPDATE
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // --- Netty BOM: kunci versi semua modul Netty biar konsisten ---
     implementation(platform("io.netty:netty-bom:4.1.111.Final"))
     // --- Modul yang dibutuhin WebSocket HiveMQ (HTTP + handler) ---
@@ -99,10 +105,18 @@ dependencies {
 
     //room database
     implementation("androidx.room:room-runtime:2.8.4")
+    implementation(libs.androidx.activity)
     kapt("androidx.room:room-compiler:2.8.4")
 
     //WorkManager
     implementation("androidx.work:work-runtime-ktx:2.11.2")
+
+    //circleindicator
+    implementation("me.relex:circleindicator:2.1.6")
+
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // TEST
     testImplementation(libs.junit)
