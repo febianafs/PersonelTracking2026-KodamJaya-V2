@@ -68,6 +68,56 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     private var hasPublishedStreamStart = false
     private lateinit var sessionManager: SessionManager
 
+    // =============== LOG OPTIMASI STREAM ===============
+    private val statsHandler = Handler(Looper.getMainLooper())
+    private var streamStartTime = 0L
+    private var reconnectCount = 0
+    private fun startStreamMonitor() {
+
+        statsHandler.removeCallbacksAndMessages(null)
+
+        statsHandler.post(object : Runnable {
+
+            override fun run() {
+
+                if (!rtmpCamera.isStreaming) {
+                    Log.w(
+                        "STREAM_STATS",
+                        "stream stopped"
+                    )
+                    return
+                }
+
+                val uptime =
+                    (System.currentTimeMillis() - streamStartTime) / 1000
+
+                val resolution =
+                    if (viewModel.isHdSelected.value) {
+                        "HD"
+                    } else {
+                        "SD"
+                    }
+
+                Log.e(
+                    "STREAM_STATS",
+                    """
+                uptime=${uptime}s
+                reconnects=$reconnectCount
+                resolution=$resolution
+                streaming=${rtmpCamera.isStreaming}
+                preview=${rtmpCamera.isOnPreview}
+                pip=$isInPictureInPictureMode
+                mic=$isMicEnabled
+                camera=$isCameraEnabled
+                """.trimIndent()
+                )
+
+                statsHandler.postDelayed(this, 1000)
+            }
+        })
+    }
+    // =============== ================ ===============
+
     // Stream resolution option
     companion object {
         val RESOLUTION_LD = Pair(640, 360)
@@ -85,6 +135,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onConnectionSuccess() {
         Log.d("RTMP_DEBUG", "onConnectionSuccess")
+        streamStartTime = System.currentTimeMillis()
+        startStreamMonitor()
         runOnUiThread {
             Toast.makeText(this, "Stream connected", Toast.LENGTH_SHORT).show()
         }
@@ -92,6 +144,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onConnectionFailed(reason: String) {
         Log.e("RTMP_DEBUG", "onConnectionFailed: $reason")
+        reconnectCount++
         // SARAN 4: restart preview setelah koneksi gagal
         runOnUiThread {
             Toast.makeText(this, "Connection failed: $reason", Toast.LENGTH_SHORT).show()
@@ -310,16 +363,19 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val res = if (viewModel.isHdSelected.value) RESOLUTION_HD else RESOLUTION_SD
         try {
             if (rtmpCamera.isOnPreview) {
-                rtmpCamera.stopPreview()
+                return
             }
 
             Log.d(
                 "RTMP_DEBUG",
                 "startPreview width=${res.first}, height=${res.second}"
             )
-            rtmpCamera.startPreview(CameraHelper.Facing.BACK,
-                res.first,
-                res.second)
+
+            Log.d("ROTATION", CameraHelper.getCameraOrientation(this).toString())
+            rtmpCamera.startPreview(
+                CameraHelper.Facing.BACK,
+                res.second,
+                res.first)
             binding.layoutIdle?.visibility = View.GONE
             binding.surfaceView?.visibility = View.VISIBLE
         } catch (e: Exception) {
@@ -372,6 +428,16 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                 "RTMP_DEBUG",
                 "prepareVideo width=${res.second}, height=${res.first}, bitrate=$videoBitrate"
             )
+            Log.e(
+                "STREAM_CONFIG",
+                """
+                        width=${res.second}
+                        height=${res.first}
+                        fps=30
+                        bitrate=${videoBitrate / 1024} kbps
+                        rotation=${CameraHelper.getCameraOrientation(this)}
+                        """.trimIndent()
+                                )
             // SARAN 7: bungkus dengan try-catch
             val prepared = rtmpCamera.prepareAudio(
                 96 * 1024,
