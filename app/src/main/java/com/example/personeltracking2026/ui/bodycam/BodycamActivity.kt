@@ -1,6 +1,7 @@
 package com.example.personeltracking2026.ui.bodycam
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.util.Rational
 import android.view.ContextThemeWrapper
@@ -21,6 +23,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -72,6 +75,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     private val statsHandler = Handler(Looper.getMainLooper())
     private var streamStartTime = 0L
     private var reconnectCount = 0
+
     private fun startStreamMonitor() {
 
         statsHandler.removeCallbacksAndMessages(null)
@@ -98,6 +102,10 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                         "SD"
                     }
 
+                val usedMem =
+                    (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1024 / 1024
+
+                val thermal = getThermalStatus()
                 Log.e(
                     "STREAM_STATS",
                     """
@@ -109,12 +117,50 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                 pip=$isInPictureInPictureMode
                 mic=$isMicEnabled
                 camera=$isCameraEnabled
+                memory=${usedMem}MB
+                thermal=$thermal
                 """.trimIndent()
                 )
 
                 statsHandler.postDelayed(this, 1000)
             }
         })
+    }
+
+    private fun getThermalStatus(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return "UNSUPPORTED"
+        }
+
+        val powerManager =
+            getSystemService(POWER_SERVICE) as PowerManager
+
+        return when (powerManager.currentThermalStatus) {
+
+            PowerManager.THERMAL_STATUS_NONE ->
+                "NONE"
+
+            PowerManager.THERMAL_STATUS_LIGHT ->
+                "LIGHT"
+
+            PowerManager.THERMAL_STATUS_MODERATE ->
+                "MODERATE"
+
+            PowerManager.THERMAL_STATUS_SEVERE ->
+                "SEVERE"
+
+            PowerManager.THERMAL_STATUS_CRITICAL ->
+                "CRITICAL"
+
+            PowerManager.THERMAL_STATUS_EMERGENCY ->
+                "EMERGENCY"
+
+            PowerManager.THERMAL_STATUS_SHUTDOWN ->
+                "SHUTDOWN"
+
+            else ->
+                "UNKNOWN"
+        }
     }
     // =============== ================ ===============
 
@@ -426,9 +472,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         val res = if (viewModel.isHdSelected.value) RESOLUTION_HD else RESOLUTION_SD
         val videoBitrate = if (viewModel.isHdSelected.value) {
-            800 * 1024  // HD
+            1500 * 1024  // HD
         } else {
-            400 * 1024   // SD
+            700 * 1024   // SD
         }
 
         try {
@@ -454,7 +500,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             ) && rtmpCamera.prepareVideo(
                 res.second,
                 res.first,
-                30,
+                20,
                 videoBitrate,
                 CameraHelper.getCameraOrientation(this)
             )
@@ -779,33 +825,43 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             binding.pipOverlay?.visibility = View.VISIBLE
             binding.pipOverlay?.alpha = 1f
 
-            // Refresh GL
-            binding.surfaceView.postDelayed({
-                try {
-                    if (rtmpCamera.isOnPreview) {
-                        rtmpCamera.stopPreview()
-                        rtmpCamera.startPreview(
-                            CameraHelper.Facing.BACK,
-                            if (viewModel.isHdSelected.value) RESOLUTION_HD.first else RESOLUTION_SD.first,
-                            if (viewModel.isHdSelected.value) RESOLUTION_HD.second else RESOLUTION_SD.second
-                        )
+            binding.pipOverlay?.postDelayed({
+                binding.pipOverlay?.animate()
+                    ?.alpha(0f)
+                    ?.setDuration(300)
+                    ?.withEndAction {
+                        binding.pipOverlay?.visibility = View.GONE
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                    ?.start()
+            }, 200)
 
-                // fade out overlay
-                binding.pipOverlay?.postDelayed({
-                    binding.pipOverlay?.animate()
-                        ?.alpha(0f)
-                        ?.setDuration(300)
-                        ?.withEndAction {
-                            binding.pipOverlay?.visibility = View.GONE
-                        }
-                        ?.start()
-                }, 200)
-
-            }, 50)
+//            // Refresh GL
+//            binding.surfaceView.postDelayed({
+//                try {
+//                    if (rtmpCamera.isOnPreview) {
+//                        rtmpCamera.stopPreview()
+//                        rtmpCamera.startPreview(
+//                            CameraHelper.Facing.BACK,
+//                            if (viewModel.isHdSelected.value) RESOLUTION_HD.first else RESOLUTION_SD.first,
+//                            if (viewModel.isHdSelected.value) RESOLUTION_HD.second else RESOLUTION_SD.second
+//                        )
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//
+//                // fade out overlay
+//                binding.pipOverlay?.postDelayed({
+//                    binding.pipOverlay?.animate()
+//                        ?.alpha(0f)
+//                        ?.setDuration(300)
+//                        ?.withEndAction {
+//                            binding.pipOverlay?.visibility = View.GONE
+//                        }
+//                        ?.start()
+//                }, 200)
+//
+//            }, 50)
 
             // Hapus card effect pas masuk mode PiP
             binding.cameraCard.radius = 0f
