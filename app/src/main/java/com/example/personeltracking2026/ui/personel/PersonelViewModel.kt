@@ -169,8 +169,15 @@ class PersonelViewModel(
         viewModelScope.launch(Dispatchers.IO) { refreshBattery() }
     }
 
+    fun stopPublishing() {
+        publishJob?.cancel()
+        publishJob = null
+        Log.d("MQTT_TIMER", "STOP PUBLISHING")
+    }
+
     override fun onCleared() {
         super.onCleared()
+        publishJob?.cancel()
     }
 
     // ─── BATTERY RECEIVER LIFECYCLE ──────────────────────────────────────────
@@ -371,6 +378,14 @@ class PersonelViewModel(
     }
 
     private fun publishDataPayload(location: LocationData) {
+
+        val app = getApplication<Application>() as App
+
+        if (app.currentMode != com.example.personeltracking2026.core.device.DeviceMode.RADIO) {
+            Log.d("MQTT_TIMER", "NOT RADIO MODE -> SKIP")
+            return
+        }
+
         if (!mqttManager.isConnected()) {
             Log.d("MQTT_TIMER", "MQTT NOT CONNECTED → SKIP")
             return
@@ -387,7 +402,6 @@ class PersonelViewModel(
         val serialNumber = identity.serial
         val androidId    = identity.androidId
 
-        val app = getApplication<Application>() as App
         val hr  = app.currentHeartRate
         val hrTs = app.currentHeartRateTs
 
