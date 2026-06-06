@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import com.example.personeltracking2026.core.device.DeviceMode
+import org.maplibre.android.MapLibre
 
 class App : Application() {
 
@@ -32,6 +33,8 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         mqttManager = MqttManager(this)
+
+        MapLibre.getInstance(this)
 
         // GLOBAL BLE COLLECTOR
         appScope.launch {

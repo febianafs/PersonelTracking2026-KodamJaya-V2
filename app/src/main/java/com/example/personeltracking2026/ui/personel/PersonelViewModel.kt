@@ -63,53 +63,86 @@ class PersonelViewModel(
     private val sessionManager    : SessionManager
 ) : AndroidViewModel(application) {
 
+//    private val gpsTraceFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_trace.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,type,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
+//
+//    private fun saveGpsTrace(
+//        type: String,
+//        loc: LocationData
+//    ) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(gpsTraceFile, true).use { writer ->
+//                    writer.append(
+//                        "${loc.timestamp}," +
+//                                "$type," +
+//                                "${loc.lat}," +
+//                                "${loc.lon}," +
+//                                "${loc.accuracy}\n"
+//                    )
+//                }
+//            } catch (e: Exception) {
+//                Log.e("GPS_CSV", "Error", e)
+//            }
+//        }
+//    }
+
     // LOG CSV START
-    private val rawFile by lazy {
-        File(
-            getApplication<Application>().getExternalFilesDir(null),
-            "gps_filtered.csv"
-        ).apply {
-            if (!exists()) {
-                createNewFile()
-                writeText("timestamp,lat,lon,accuracy\n")
-            }
-        }
-    }
-    private val publishFile by lazy {
-        File(
-            getApplication<Application>().getExternalFilesDir(null),
-            "gps_publish.csv"
-        ).apply {
-            if (!exists()) {
-                createNewFile()
-                writeText("timestamp,lat,lon,accuracy\n")
-            }
-        }
-    }
+//    private val rawFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_filtered.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
+//    private val publishFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_publish.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
 
-    fun saveFilteredCsv(loc: LocationData) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                FileWriter(rawFile, true).use { writer ->
-                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
-                }
-            } catch (e: Exception) {
-                Log.e("CSV_FILTERED", "Error", e)
-            }
-        }
-    }
+//    fun saveFilteredCsv(loc: LocationData) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(rawFile, true).use { writer ->
+//                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("CSV_FILTERED", "Error", e)
+//            }
+//        }
+//    }
 
-    fun savePublishCsv(loc: LocationData) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                FileWriter(publishFile, true).use { writer ->
-                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
-                }
-            } catch (e: Exception) {
-                Log.e("CSV_PUBLISH", "Error", e)
-            }
-        }
-    }
+//    fun savePublishCsv(loc: LocationData) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(publishFile, true).use { writer ->
+//                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("CSV_PUBLISH", "Error", e)
+//            }
+//        }
+//    }
     // LOG CSV END
 
     companion object {
@@ -427,6 +460,7 @@ class PersonelViewModel(
         // --- INPUT CSV ---
         //savePublishCsv(location)
         //Log.d("MQTT_TIMER", "SEND PAYLOAD = $payload")
+//        saveGpsTrace("PUBLISH", location)
         Log.d("GPS_TEST", "time=${location.timestamp}, lat=${location.lat}, lon=${location.lon}")
         mqttManager.publishRadioData(payload)
         RadioDataPayload::class.java.declaredFields.forEach {
@@ -440,10 +474,21 @@ class PersonelViewModel(
 
     private fun processLocation(newLoc: LocationData): LocationData? {
 
+        Log.d(
+            "GPS_RAW",
+            "RAW lat=${newLoc.lat}, lon=${newLoc.lon}, acc=${newLoc.accuracy}"
+        )
+
+//        saveGpsTrace("RAW", newLoc)
+
         // 1. FILTER ACCURACY
-        if (newLoc.accuracy > 20f) return null
+        if (newLoc.accuracy > 30f) {
+//            saveGpsTrace("REJECT", newLoc)
+            return null
+        }
         val last = lastAccepted
         if (last == null) {
+//            saveGpsTrace("ACCEPT", newLoc)
             lastAccepted = newLoc
             return newLoc
         }
@@ -456,9 +501,13 @@ class PersonelViewModel(
         }
 
         // --- OUTLIER FILTER ---
-        val maxJump = 8f + 2f * dt
+        val maxJump = 50f + 5f * dt
         if (dist > maxJump) {
-            Log.d("FILTER", "OUTLIER: $dist")
+//            saveGpsTrace("OUTLIER", newLoc)
+            Log.d(
+                "GPS_FILTER",
+                "OUTLIER dist=$dist maxJump=$maxJump dt=$dt"
+            )
             return null
         }
 
@@ -473,6 +522,12 @@ class PersonelViewModel(
             val blended = newLoc.copy(lat = blendedLat, lon = blendedLon)
             val finalLoc = smooth(blended, dt)
 
+            Log.d(
+                "GPS_ACCEPT",
+                "lat=${finalLoc.lat}, lon=${finalLoc.lon}, acc=${finalLoc.accuracy}"
+            )
+
+//            saveGpsTrace("ACCEPT", finalLoc)
             lastAccepted = finalLoc
             return finalLoc
         }
@@ -498,6 +553,9 @@ class PersonelViewModel(
         } else {
             blended
         }
+
+//        saveGpsTrace("ACCEPT", finalLoc)
+
         lastAccepted = finalLoc
         return finalLoc
     }

@@ -89,6 +89,15 @@ class AppLocationManager(private val context: Context) {
         fusedCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
+
+                    Log.d(
+                        "GPS_DEBUG",
+                        "lat=${location.latitude}, " +
+                                "lon=${location.longitude}, " +
+                                "acc=${location.accuracy}, " +
+                                "provider=${location.provider}"
+                    )
+
                     onLocationUpdate?.invoke(
                         location.latitude,
                         location.longitude,
