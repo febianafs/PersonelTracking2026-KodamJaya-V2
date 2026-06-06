@@ -92,7 +92,7 @@ class FullscreenMapActivity : AppCompatActivity() {
 
                 map.cameraPosition = CameraPosition.Builder()
                     .target(point)
-                    .zoom(18.0)
+                    .zoom(12.0)
                     .build()
 
                 addMarker(currentLat, currentLon)

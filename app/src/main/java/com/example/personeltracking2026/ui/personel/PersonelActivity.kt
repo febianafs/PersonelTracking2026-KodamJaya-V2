@@ -103,6 +103,8 @@ class PersonelActivity : BaseActivity() {
     private var lastAccepted: LocationData? = null
     private val smoothWindow = ArrayDeque<LocationData>()
 
+    private var isMapStyleReady = false
+
     // ─── SOS ─────────────────────────────────────────────────────────────────
     private var markerBlinkJob: Job? = null
 
@@ -140,17 +142,23 @@ class PersonelActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
-        MapLibre.getInstance(
-            this,
-            null,
-            org.maplibre.android.WellKnownTileServer.MapLibre
-        )
-
         binding        = ActivityPersonelBinding.inflate(layoutInflater)
         sessionManager = SessionManager(this)
         mqttPrefs      = getSharedPreferences("mqtt_settings", MODE_PRIVATE)
 
         setContentView(binding.root)
+
+        // WAJIB: MapView butuh onCreate manual dengan savedInstanceState yang benar
+        binding.mapView.onCreate(savedInstanceState)
+
+        // Baca map type DULU sebelum setupMap
+        val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
+            .getString("map_type", MapTypeManager.MapType.STANDARD.name)
+        currentMapType = MapTypeManager.MapType.values()
+            .firstOrNull { it.name == savedType }
+            ?: MapTypeManager.MapType.STANDARD
+
+        setupMap()
 
         requestBatteryOptimizationExemption()
 
@@ -173,17 +181,6 @@ class PersonelActivity : BaseActivity() {
 
         reconnectManager = MqttReconnectManager(this, viewModel.mqttManager)
 
-        val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
-            .getString("map_type", MapTypeManager.MapType.STANDARD.name)
-
-        val newType = MapTypeManager.MapType.values()
-            .firstOrNull { it.name == savedType }
-            ?: MapTypeManager.MapType.STANDARD
-
-        currentMapType = newType
-
-        setupMap()
-
         val deviceManager = DeviceIdentityManager(this)
         val identity = deviceManager.getIdentity()
 
@@ -192,13 +189,8 @@ class PersonelActivity : BaseActivity() {
         }
 
         val app = application as App
-
         app.currentMode = DeviceMode.RADIO
 
-        // FIX: SosManager di-init ulang di sini dengan locationProvider
-        // yang membaca koordinat dari App level (bukan hanya dari PersonelActivity)
-        // Ini memastikan SosManager selalu punya koordinat terbaru,
-        // bahkan saat SOS dipencet dari SettingsActivity
         SosManager.init(
             mqtt             = app.mqttManager,
             session          = sessionManager,
@@ -227,6 +219,11 @@ class PersonelActivity : BaseActivity() {
         observeAllStates()
         loadPersonelData()
         requestLocationPermission()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        binding.mapView.onSaveInstanceState(outState)
     }
 
     override fun onStart() {
@@ -335,6 +332,10 @@ class PersonelActivity : BaseActivity() {
                 // Lokasi GPS
                 launch {
                     viewModel.locationState.collect { state ->
+                        Log.d(
+                            "GPS_DEBUG",
+                            "GPS lat=${state.data?.lat} lon=${state.data?.lon}"
+                        )
 
                         val accuracy = state.data?.accuracy ?: Float.MAX_VALUE
 
@@ -357,6 +358,12 @@ class PersonelActivity : BaseActivity() {
                         }
 
                         state.data?.let {
+
+                            Log.d(
+                                "GPS_DEBUG",
+                                "LOCATION RECEIVED lat=${it.lat} lon=${it.lon} acc=${it.accuracy}"
+                            )
+
                             updateCoordinates(it.lat, it.lon)
 
                             // FIX: Update koordinat ke App level
@@ -618,24 +625,34 @@ class PersonelActivity : BaseActivity() {
     // ─── MAP ─────────────────────────────────────────────────────────────────
 
     private fun setupMap() {
+
+        Log.d("MAP_DEBUG", "setupMap START")
+
         mapView = binding.mapView
-        mapView.onCreate(null)
+//        mapView.onCreate(null)
 
         mapView.getMapAsync { map ->
+
+            Log.d("MAP_DEBUG", "getMapAsync")
             mapLibreMap = map
 
             val styleUrl = MapTypeManager.getStyleUrl(currentMapType)
             map.setStyle(
                 Style.Builder().fromUri(styleUrl)
-            ) {
+            ) { style ->
+
+                if (isMapStyleReady) return@setStyle
+                isMapStyleReady = true
+
+                Log.d("MAP_DEBUG", "STYLE LOADED")
+
                 val point = LatLng(currentLat, currentLon)
 
                 map.cameraPosition = CameraPosition.Builder()
                     .target(point)
-                    .zoom(15.0)
+                    .zoom(12.0)
                     .build()
 
-                val style = it
 
                 geoJsonSource = GeoJsonSource(
                     "personel-source",
@@ -662,12 +679,21 @@ class PersonelActivity : BaseActivity() {
                         iconIgnorePlacement(true)
                     )
                 style.addLayer(symbolLayer)
+
+                Log.d("MAP_DEBUG", "Sources: ${style.sources.map { it.id }}")
+                Log.d("MAP_DEBUG", "Layers: ${style.layers.map { it.id }}")
             }
         }
         Log.d("INIT", "MAP READY")
     }
 
     private fun updateMarker(lat: Double, lon: Double) {
+
+        Log.d(
+            "MARKER_DEBUG",
+            "MOVE MARKER lat=$lat lon=$lon"
+        )
+
         geoJsonSource?.setGeoJson(
             Point.fromLngLat(lon, lat)
         )
@@ -803,7 +829,7 @@ class PersonelActivity : BaseActivity() {
         val config = MqttConfigManager(this).load()
 
         pagerAdapter.mqttHost = config.host ?: "-"
-        pagerAdapter.mqttPort = config.tcpPort.toString()
+        pagerAdapter.mqttPort = config.wsPort.toString()
         pagerAdapter.interval = mqttPrefs.getString("interval", "5 seconds") ?: "5 seconds"
 
         pagerAdapter.notifyItemChanged(2)
