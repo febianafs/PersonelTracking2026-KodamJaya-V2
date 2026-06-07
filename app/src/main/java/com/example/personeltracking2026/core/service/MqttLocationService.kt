@@ -28,10 +28,13 @@ import com.example.personeltracking2026.core.mqtt.MqttReconnectManager
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.utils.Constants
 import com.example.personeltracking2026.utils.DeviceIdentityManager
+import com.example.personeltracking2026.utils.StreamUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.personeltracking2026.core.device.DeviceMode
 
@@ -73,6 +76,7 @@ class MqttLocationService : Service() {
     // Throttle — cegah publish duplikat
     private var lastPublishTime = 0L
     private var publishIntervalMs = 5000L
+    private var bodycamPublishJob: Job? = null
 
     private val intervalChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -139,6 +143,7 @@ class MqttLocationService : Service() {
 
                 reconnectManager.start()
                 startLocationUpdates()
+                startBodycamIntervalPublisher()
             }
             ACTION_STOP -> {
                 Log.d(TAG, "Service stopping")
@@ -151,6 +156,7 @@ class MqttLocationService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         reconnectManager.stop()
+        bodycamPublishJob?.cancel()
         appLocationManager.stopUpdates()
         serviceScope.cancel()
         if (::wakeLock.isInitialized && wakeLock.isHeld) {
@@ -217,6 +223,7 @@ class MqttLocationService : Service() {
         appLocationManager.stopUpdates()
         appLocationManager.setInterval(publishIntervalMs)
         appLocationManager.startUpdates()
+        startBodycamIntervalPublisher()
 
         Log.d(TAG, "Location interval updated without restarting service")
     }
@@ -277,6 +284,51 @@ class MqttLocationService : Service() {
         }
     }
 
+    private fun startBodycamIntervalPublisher() {
+        bodycamPublishJob?.cancel()
+        bodycamPublishJob = serviceScope.launch {
+            while (true) {
+                publishBodycamDataIfActive()
+                delay(publishIntervalMs)
+            }
+        }
+    }
+
+    private fun publishBodycamDataIfActive() {
+        val app = application as App
+
+        if (app.currentMode != DeviceMode.BODYCAM) {
+            Log.d(TAG, "Not BODYCAM mode -> skip bodycam publish")
+            return
+        }
+
+        val mqttManager = app.mqttManager
+
+        if (!mqttManager.isConnected()) {
+            Log.d(TAG, "MQTT not connected, skip bodycam publish")
+            return
+        }
+
+        val identity = DeviceIdentityManager(this).getIdentity()
+
+        if (identity == null) {
+            Log.e("MQTT", "Serial number is required")
+            return
+        }
+
+        val serialNumber = identity.serial
+        val payload = MqttPayloadBuilder.buildBodycamDataPayload(
+            session = sessionManager,
+            serialNumber = serialNumber,
+            androidId = identity.androidId,
+            streamUrl = StreamUtils.getRtmpUrl(serialNumber),
+            stream = app.currentBodycamStream
+        )
+
+        Log.d(TAG, "BODYCAM publish interval=${publishIntervalMs}ms stream=${app.currentBodycamStream}")
+        mqttManager.publishBodycamData(payload)
+    }
+
     private fun getBatteryLevel(): Int {
         return try {
             val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
@@ -291,10 +343,10 @@ class MqttLocationService : Service() {
                 m * 60 * 1000
             }
             interval.contains("second") -> {
-                val s = interval.filter { it.isDigit() }.toLongOrNull() ?: 10L
+                val s = interval.filter { it.isDigit() }.toLongOrNull() ?: 5L
                 s * 1000
             }
-            else -> 10000L
+            else -> 5000L
         }
     }
 

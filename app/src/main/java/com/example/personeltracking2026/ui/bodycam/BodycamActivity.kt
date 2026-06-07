@@ -1,6 +1,7 @@
 package com.example.personeltracking2026.ui.bodycam
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.util.Rational
 import android.view.ContextThemeWrapper
@@ -21,6 +23,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -33,7 +36,6 @@ import com.example.personeltracking2026.App
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.core.base.BaseActivity
 import com.example.personeltracking2026.core.navigation.LastScreen
-import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.sos.SosManager
 import com.example.personeltracking2026.data.repository.BodycamRepository
@@ -46,6 +48,7 @@ import com.pedro.library.rtmp.RtmpCamera2
 import com.pedro.library.view.OpenGlView
 import kotlinx.coroutines.launch
 import com.example.personeltracking2026.utils.DeviceIdentityManager
+import com.example.personeltracking2026.utils.StreamUtils
 import com.example.personeltracking2026.core.device.DeviceMode
 import com.example.personeltracking2026.core.service.MqttLocationService
 
@@ -65,8 +68,100 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     private var originalRadius: Float = 0f
     private var originalElevation: Float = 0f
     private var originalMargins: ViewGroup.MarginLayoutParams? = null
-    private var hasPublishedStreamStart = false
     private lateinit var sessionManager: SessionManager
+
+    // =============== LOG OPTIMASI STREAM ===============
+    private val statsHandler = Handler(Looper.getMainLooper())
+    private var streamStartTime = 0L
+    private var reconnectCount = 0
+
+    private fun startStreamMonitor() {
+
+        statsHandler.removeCallbacksAndMessages(null)
+
+        statsHandler.post(object : Runnable {
+
+            override fun run() {
+
+                if (!rtmpCamera.isStreaming) {
+                    Log.w(
+                        "STREAM_STATS",
+                        "stream stopped"
+                    )
+                    return
+                }
+
+                val uptime =
+                    (System.currentTimeMillis() - streamStartTime) / 1000
+
+                val resolution =
+                    if (viewModel.isHdSelected.value) {
+                        "HD"
+                    } else {
+                        "SD"
+                    }
+
+                val usedMem =
+                    (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1024 / 1024
+
+                val thermal = getThermalStatus()
+                Log.e(
+                    "STREAM_STATS",
+                    """
+                uptime=${uptime}s
+                reconnects=$reconnectCount
+                resolution=$resolution
+                streaming=${rtmpCamera.isStreaming}
+                preview=${rtmpCamera.isOnPreview}
+                pip=$isInPictureInPictureMode
+                mic=$isMicEnabled
+                camera=$isCameraEnabled
+                memory=${usedMem}MB
+                thermal=$thermal
+                """.trimIndent()
+                )
+
+                statsHandler.postDelayed(this, 1000)
+            }
+        })
+    }
+
+    private fun getThermalStatus(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return "UNSUPPORTED"
+        }
+
+        val powerManager =
+            getSystemService(POWER_SERVICE) as PowerManager
+
+        return when (powerManager.currentThermalStatus) {
+
+            PowerManager.THERMAL_STATUS_NONE ->
+                "NONE"
+
+            PowerManager.THERMAL_STATUS_LIGHT ->
+                "LIGHT"
+
+            PowerManager.THERMAL_STATUS_MODERATE ->
+                "MODERATE"
+
+            PowerManager.THERMAL_STATUS_SEVERE ->
+                "SEVERE"
+
+            PowerManager.THERMAL_STATUS_CRITICAL ->
+                "CRITICAL"
+
+            PowerManager.THERMAL_STATUS_EMERGENCY ->
+                "EMERGENCY"
+
+            PowerManager.THERMAL_STATUS_SHUTDOWN ->
+                "SHUTDOWN"
+
+            else ->
+                "UNKNOWN"
+        }
+    }
+    // =============== ================ ===============
 
     // Stream resolution option
     companion object {
@@ -85,6 +180,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onConnectionSuccess() {
         Log.d("RTMP_DEBUG", "onConnectionSuccess")
+        streamStartTime = System.currentTimeMillis()
+        startStreamMonitor()
         runOnUiThread {
             Toast.makeText(this, "Stream connected", Toast.LENGTH_SHORT).show()
         }
@@ -92,6 +189,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     override fun onConnectionFailed(reason: String) {
         Log.e("RTMP_DEBUG", "onConnectionFailed: $reason")
+        reconnectCount++
         // SARAN 4: restart preview setelah koneksi gagal
         runOnUiThread {
             Toast.makeText(this, "Connection failed: $reason", Toast.LENGTH_SHORT).show()
@@ -161,6 +259,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         val app = application as App
         app.currentMode = DeviceMode.BODYCAM
+        app.currentBodycamStream = 0
         Log.d("DEVICE_MODE", "BodycamActivity onCreate -> BODYCAM")
 
         SosManager.init(
@@ -219,6 +318,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         val app = application as App
         app.currentMode = DeviceMode.BODYCAM
+        app.currentBodycamStream = if (viewModel.isLive()) 1 else 0
         Log.d("DEVICE_MODE", "BodycamActivity onResume -> BODYCAM")
 
         SessionManager(this).saveLastScreen(LastScreen.BODYCAM)
@@ -254,6 +354,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         if (!isInPictureInPictureMode) {
             if (viewModel.isLive()) viewModel.stopStream()
+            updateBodycamStreamState(0)
             stopCameraPreview()
         }
     }
@@ -267,6 +368,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             if (rtmpCamera.isStreaming) rtmpCamera.stopStream()
             if (rtmpCamera.isOnPreview) rtmpCamera.stopPreview()
         }
+        updateBodycamStreamState(0)
     }
 
     // Masuk mode PiP ketika menekan tombol Home
@@ -318,16 +420,19 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val res = if (viewModel.isHdSelected.value) RESOLUTION_HD else RESOLUTION_SD
         try {
             if (rtmpCamera.isOnPreview) {
-                rtmpCamera.stopPreview()
+                return
             }
 
             Log.d(
                 "RTMP_DEBUG",
                 "startPreview width=${res.first}, height=${res.second}"
             )
-            rtmpCamera.startPreview(CameraHelper.Facing.BACK,
-                res.first,
-                res.second)
+
+            Log.d("ROTATION", CameraHelper.getCameraOrientation(this).toString())
+            rtmpCamera.startPreview(
+                CameraHelper.Facing.BACK,
+                res.second,
+                res.first)
             binding.layoutIdle?.visibility = View.GONE
             binding.surfaceView?.visibility = View.VISIBLE
         } catch (e: Exception) {
@@ -370,9 +475,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         val res = if (viewModel.isHdSelected.value) RESOLUTION_HD else RESOLUTION_SD
         val videoBitrate = if (viewModel.isHdSelected.value) {
-            800 * 1024  // HD
+            1500 * 1024  // HD
         } else {
-            400 * 1024   // SD
+            700 * 1024   // SD
         }
 
         try {
@@ -380,6 +485,16 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                 "RTMP_DEBUG",
                 "prepareVideo width=${res.second}, height=${res.first}, bitrate=$videoBitrate"
             )
+            Log.e(
+                "STREAM_CONFIG",
+                """
+                        width=${res.second}
+                        height=${res.first}
+                        fps=30
+                        bitrate=${videoBitrate / 1024} kbps
+                        rotation=${CameraHelper.getCameraOrientation(this)}
+                        """.trimIndent()
+                                )
             // SARAN 7: bungkus dengan try-catch
             val prepared = rtmpCamera.prepareAudio(
                 96 * 1024,
@@ -388,7 +503,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             ) && rtmpCamera.prepareVideo(
                 res.second,
                 res.first,
-                30,
+                20,
                 videoBitrate,
                 CameraHelper.getCameraOrientation(this)
             )
@@ -567,6 +682,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             is StreamState.Idle -> {
                 // SARAN 5: hanya stop kalau memang sedang streaming
                 stopRtmpStream()
+                updateBodycamStreamState(0)
                 binding.layoutIdle?.visibility = if (isCameraEnabled) View.VISIBLE else View.GONE
                 binding.layoutEnded?.visibility = View.GONE
                 binding.liveIndicator?.visibility = View.GONE
@@ -581,9 +697,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             }
             is StreamState.Live -> {
                 startRtmpStream()
-
-                hasPublishedStreamStart = true
-                publishBodycamStream(1)
+                updateBodycamStreamState(1)
 
                 binding.layoutIdle?.visibility = View.GONE
                 binding.layoutEnded?.visibility = View.GONE
@@ -594,13 +708,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             }
             is StreamState.Ended -> {
                 stopRtmpStream()
-
-                if (hasPublishedStreamStart) {
-                    publishBodycamStream(0)
-                }
+                updateBodycamStreamState(0)
 
                 stopCameraPreview()
-                hasPublishedStreamStart = false
 
                 binding.surfaceView?.visibility = View.GONE
                 binding.layoutIdle?.visibility = View.GONE
@@ -713,33 +823,43 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             binding.pipOverlay?.visibility = View.VISIBLE
             binding.pipOverlay?.alpha = 1f
 
-            // Refresh GL
-            binding.surfaceView.postDelayed({
-                try {
-                    if (rtmpCamera.isOnPreview) {
-                        rtmpCamera.stopPreview()
-                        rtmpCamera.startPreview(
-                            CameraHelper.Facing.BACK,
-                            if (viewModel.isHdSelected.value) RESOLUTION_HD.first else RESOLUTION_SD.first,
-                            if (viewModel.isHdSelected.value) RESOLUTION_HD.second else RESOLUTION_SD.second
-                        )
+            binding.pipOverlay?.postDelayed({
+                binding.pipOverlay?.animate()
+                    ?.alpha(0f)
+                    ?.setDuration(300)
+                    ?.withEndAction {
+                        binding.pipOverlay?.visibility = View.GONE
                     }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                    ?.start()
+            }, 200)
 
-                // fade out overlay
-                binding.pipOverlay?.postDelayed({
-                    binding.pipOverlay?.animate()
-                        ?.alpha(0f)
-                        ?.setDuration(300)
-                        ?.withEndAction {
-                            binding.pipOverlay?.visibility = View.GONE
-                        }
-                        ?.start()
-                }, 200)
-
-            }, 50)
+//            // Refresh GL
+//            binding.surfaceView.postDelayed({
+//                try {
+//                    if (rtmpCamera.isOnPreview) {
+//                        rtmpCamera.stopPreview()
+//                        rtmpCamera.startPreview(
+//                            CameraHelper.Facing.BACK,
+//                            if (viewModel.isHdSelected.value) RESOLUTION_HD.first else RESOLUTION_SD.first,
+//                            if (viewModel.isHdSelected.value) RESOLUTION_HD.second else RESOLUTION_SD.second
+//                        )
+//                    }
+//                } catch (e: Exception) {
+//                    e.printStackTrace()
+//                }
+//
+//                // fade out overlay
+//                binding.pipOverlay?.postDelayed({
+//                    binding.pipOverlay?.animate()
+//                        ?.alpha(0f)
+//                        ?.setDuration(300)
+//                        ?.withEndAction {
+//                            binding.pipOverlay?.visibility = View.GONE
+//                        }
+//                        ?.start()
+//                }, 200)
+//
+//            }, 50)
 
             // Hapus card effect pas masuk mode PiP
             binding.cameraCard.radius = 0f
@@ -781,23 +901,9 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     //  PUBLISH DATA PAYLOAD
     // ─────────────────────────────────────────────
 
-    private fun publishBodycamStream(stream: Int) {
-        val app = application as App
-        val identity = DeviceIdentityManager(this).getIdentity() ?: return
-
-        val serial = identity.serial
-        val androidId = identity.androidId
-        val streamUrl = StreamUtils.getRtmpUrl(serial)
-
-        val payload = MqttPayloadBuilder.buildBodycamDataPayload(
-            session = sessionManager,
-            serialNumber = serial,
-            androidId = androidId,
-            streamUrl = streamUrl,
-            stream = stream
-        )
-
-        app.mqttManager.publishBodycamData(payload)
+    private fun updateBodycamStreamState(stream: Int) {
+        (application as App).currentBodycamStream = stream
+        Log.d("BODYCAM_MQTT", "Stream state updated: $stream")
     }
 
     // ─────────────────────────────────────────────
