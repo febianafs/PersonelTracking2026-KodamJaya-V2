@@ -1,3 +1,5 @@
+package com.example.personeltracking2026.utils
+
 object StreamUtils {
 
     fun getRtmpUrl(serial: String): String {

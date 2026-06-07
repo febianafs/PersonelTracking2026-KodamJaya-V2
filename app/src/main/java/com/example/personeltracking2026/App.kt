@@ -26,6 +26,7 @@ class App : Application() {
     @Volatile var currentLat: Double = 0.0
     @Volatile var currentLon: Double = 0.0
     @Volatile var currentAccuracy: Float = 999f
+    @Volatile var currentBodycamStream: Int = 0
 
     @Volatile
     var currentMode: DeviceMode = DeviceMode.NONE
