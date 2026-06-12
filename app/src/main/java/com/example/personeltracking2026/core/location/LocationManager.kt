@@ -20,6 +20,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 
 class AppLocationManager(private val context: Context) {
 
@@ -34,6 +35,7 @@ class AppLocationManager(private val context: Context) {
     // FusedLocationProvider (Google Play Services)
     private var fusedClient: FusedLocationProviderClient? = null
     private var fusedCallback: LocationCallback? = null
+    private var currentLocationCancellation: CancellationTokenSource? = null
 
     // Android LocationManager (fallback)
     private var locationManager: LocationManager? = null
@@ -89,17 +91,27 @@ class AppLocationManager(private val context: Context) {
         fusedCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
-                    onLocationUpdate?.invoke(
-                        location.latitude,
-                        location.longitude,
-                        location.accuracy,
-                        "Fused"
-                    )
+
+                    emitLocation(location, "Fused")
                 }
             }
         }
 
         try {
+            fusedClient?.lastLocation
+                ?.addOnSuccessListener { location ->
+                    location?.let { emitLocation(it, "FusedLast") }
+                }
+
+            currentLocationCancellation?.cancel()
+            currentLocationCancellation = CancellationTokenSource()
+            fusedClient?.getCurrentLocation(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                currentLocationCancellation!!.token
+            )?.addOnSuccessListener { location ->
+                location?.let { emitLocation(it, "FusedCurrent") }
+            }
+
             fusedClient?.requestLocationUpdates(
                 request,
                 fusedCallback!!,
@@ -111,6 +123,8 @@ class AppLocationManager(private val context: Context) {
     }
 
     private fun stopFusedUpdates() {
+        currentLocationCancellation?.cancel()
+        currentLocationCancellation = null
         fusedCallback?.let { fusedClient?.removeLocationUpdates(it) }
         fusedCallback = null
         fusedClient = null
@@ -149,6 +163,8 @@ class AppLocationManager(private val context: Context) {
         }
 
         try {
+            emitBestLastKnownLocation()
+
             // GPS provider
             if (locationManager!!.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
                 gpsListener = locationListener
@@ -183,6 +199,28 @@ class AppLocationManager(private val context: Context) {
         }
     }
 
+    private fun emitBestLastKnownLocation() {
+        val manager = locationManager ?: return
+        val lastKnown = listOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER
+        ).mapNotNull { provider ->
+            if (manager.isProviderEnabled(provider)) {
+                manager.getLastKnownLocation(provider)
+            } else {
+                null
+            }
+        }.maxByOrNull { it.time }
+
+        lastKnown?.let { location ->
+            bestLocation = location
+            emitLocation(
+                location,
+                if (location.provider == LocationManager.GPS_PROVIDER) "GPSLast" else "NetworkLast"
+            )
+        }
+    }
+
     private fun stopLegacyUpdates() {
         gnssCallback.let {
             locationManager?.unregisterGnssStatusCallback(it)
@@ -203,6 +241,24 @@ class AppLocationManager(private val context: Context) {
                 ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACCESS_COARSE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun emitLocation(location: Location, source: String) {
+        Log.d(
+            "GPS_DEBUG",
+            "lat=${location.latitude}, " +
+                    "lon=${location.longitude}, " +
+                    "acc=${location.accuracy}, " +
+                    "provider=${location.provider}, " +
+                    "source=$source"
+        )
+
+        onLocationUpdate?.invoke(
+            location.latitude,
+            location.longitude,
+            location.accuracy,
+            source
+        )
     }
 
     // Algoritma cek apakah location baru lebih baik dari yang lama

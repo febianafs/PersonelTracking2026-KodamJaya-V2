@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.BatteryManager
 import android.provider.Settings
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -24,6 +23,7 @@ import com.example.personeltracking2026.data.repository.LocationRepository
 import com.example.personeltracking2026.data.repository.PersonelRepository
 import com.example.personeltracking2026.data.repository.Result
 import com.example.personeltracking2026.utils.DeviceIdentityManager
+import com.example.personeltracking2026.utils.StreamUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -44,11 +44,6 @@ data class LocationState(
     val error      : String?       = null
 )
 
-data class BatteryState(
-    val percent   : Int     = 0,
-    val isCharging: Boolean = false
-)
-
 data class HeartRateState(
     val bpm        : Int     = 0,
     val timestamp  : Long    = 0L,
@@ -63,53 +58,86 @@ class PersonelViewModel(
     private val sessionManager    : SessionManager
 ) : AndroidViewModel(application) {
 
+//    private val gpsTraceFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_trace.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,type,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
+//
+//    private fun saveGpsTrace(
+//        type: String,
+//        loc: LocationData
+//    ) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(gpsTraceFile, true).use { writer ->
+//                    writer.append(
+//                        "${loc.timestamp}," +
+//                                "$type," +
+//                                "${loc.lat}," +
+//                                "${loc.lon}," +
+//                                "${loc.accuracy}\n"
+//                    )
+//                }
+//            } catch (e: Exception) {
+//                Log.e("GPS_CSV", "Error", e)
+//            }
+//        }
+//    }
+
     // LOG CSV START
-    private val rawFile by lazy {
-        File(
-            getApplication<Application>().getExternalFilesDir(null),
-            "gps_filtered.csv"
-        ).apply {
-            if (!exists()) {
-                createNewFile()
-                writeText("timestamp,lat,lon,accuracy\n")
-            }
-        }
-    }
-    private val publishFile by lazy {
-        File(
-            getApplication<Application>().getExternalFilesDir(null),
-            "gps_publish.csv"
-        ).apply {
-            if (!exists()) {
-                createNewFile()
-                writeText("timestamp,lat,lon,accuracy\n")
-            }
-        }
-    }
+//    private val rawFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_filtered.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
+//    private val publishFile by lazy {
+//        File(
+//            getApplication<Application>().getExternalFilesDir(null),
+//            "gps_publish.csv"
+//        ).apply {
+//            if (!exists()) {
+//                createNewFile()
+//                writeText("timestamp,lat,lon,accuracy\n")
+//            }
+//        }
+//    }
 
-    fun saveFilteredCsv(loc: LocationData) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                FileWriter(rawFile, true).use { writer ->
-                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
-                }
-            } catch (e: Exception) {
-                Log.e("CSV_FILTERED", "Error", e)
-            }
-        }
-    }
+//    fun saveFilteredCsv(loc: LocationData) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(rawFile, true).use { writer ->
+//                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("CSV_FILTERED", "Error", e)
+//            }
+//        }
+//    }
 
-    fun savePublishCsv(loc: LocationData) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                FileWriter(publishFile, true).use { writer ->
-                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
-                }
-            } catch (e: Exception) {
-                Log.e("CSV_PUBLISH", "Error", e)
-            }
-        }
-    }
+//    fun savePublishCsv(loc: LocationData) {
+//        viewModelScope.launch(Dispatchers.IO) {
+//            try {
+//                FileWriter(publishFile, true).use { writer ->
+//                    writer.append("${loc.timestamp},${loc.lat},${loc.lon},${loc.accuracy}\n")
+//                }
+//            } catch (e: Exception) {
+//                Log.e("CSV_PUBLISH", "Error", e)
+//            }
+//        }
+//    }
     // LOG CSV END
 
     companion object {
@@ -133,8 +161,7 @@ class PersonelViewModel(
     private val _locationState  = MutableStateFlow(LocationState())
     val locationState : StateFlow<LocationState> = _locationState.asStateFlow()
 
-    private val _batteryState   = MutableStateFlow(BatteryState())
-    val batteryState  : StateFlow<BatteryState> = _batteryState.asStateFlow()
+    val batteryState = (application as App).batteryState
 
     private val _mqttConnected  = MutableStateFlow(false)
     val mqttConnected : StateFlow<Boolean> = _mqttConnected.asStateFlow()
@@ -167,6 +194,17 @@ class PersonelViewModel(
 
     init {
         viewModelScope.launch(Dispatchers.IO) { refreshBattery() }
+        viewModelScope.launch {
+            (application as App).gpsState.collect { location ->
+                if (location != null) {
+                    _locationState.value = LocationState(
+                        data        = location,
+                        gpsStrength = accuracyToStrength(location.accuracy),
+                        isInZone    = checkInZone(location.lat, location.lon)
+                    )
+                }
+            }
+        }
     }
 
     fun stopPublishing() {
@@ -318,14 +356,8 @@ class PersonelViewModel(
                 if (locationData != null) {
                     val filteredLoc = processLocation(locationData) ?: return@collect
 
-                    _locationState.value = LocationState(
-                        data        = filteredLoc,
-                        gpsStrength = accuracyToStrength(filteredLoc.accuracy),
-                        isInZone    = checkInZone(filteredLoc.lat, filteredLoc.lon)
-                    )
                     val app = getApplication<Application>() as App
-                    app.currentLat = filteredLoc.lat
-                    app.currentLon = filteredLoc.lon
+                    app.updateGpsLocation(filteredLoc)
 
                     // --- INPUT CSV ---
                     //saveFilteredCsv(filteredLoc)
@@ -402,13 +434,9 @@ class PersonelViewModel(
         val serialNumber = identity.serial
         val androidId    = identity.androidId
 
-        val hr  = app.currentHeartRate
-        val hrTs = app.currentHeartRateTs
+        val heartRate = app.getHeartRateSnapshot()
 
-        val isHrExpired = System.currentTimeMillis() - hrTs > 15_000
-        val finalHr = if (isHrExpired) 0 else hr
-
-        val bat = _batteryState.value
+        val bat = app.batteryState.value
 
         val payload = MqttPayloadBuilder.buildRadioDataPayload(
             session      = sessionManager,
@@ -418,8 +446,8 @@ class PersonelViewModel(
             lon          = location.lon,
             acc          = location.accuracy,
             gpsTimestamp = location.timestamp,
-            heartrate    = finalHr,
-            heartrateTs  = if (hrTs> 0) hrTs else System.currentTimeMillis(),
+            heartrate    = heartRate.bpm,
+            heartrateTs  = heartRate.timestamp,
             batteryLevel = bat.percent,
             appVersion = BuildConfig.APP_VERSION,
             rtmpUrl      = StreamUtils.getRtmpUrl(serialNumber)
@@ -427,23 +455,36 @@ class PersonelViewModel(
         // --- INPUT CSV ---
         //savePublishCsv(location)
         //Log.d("MQTT_TIMER", "SEND PAYLOAD = $payload")
+//        saveGpsTrace("PUBLISH", location)
         Log.d("GPS_TEST", "time=${location.timestamp}, lat=${location.lat}, lon=${location.lon}")
         mqttManager.publishRadioData(payload)
+        Log.d("MQTT_SOURCE", "PUBLISH FROM VIEWMODEL")
         RadioDataPayload::class.java.declaredFields.forEach {
             Log.d("FIELDS", it.name)
         }
         Log.d(
             "HR_DEBUG",
-            "PUBLISH HR = $finalHr, expired=$isHrExpired"
+            "PUBLISH HR = ${heartRate.bpm}, expired=${heartRate.isExpired}"
         )
     }
 
     private fun processLocation(newLoc: LocationData): LocationData? {
 
+        Log.d(
+            "GPS_RAW",
+            "RAW lat=${newLoc.lat}, lon=${newLoc.lon}, acc=${newLoc.accuracy}"
+        )
+
+//        saveGpsTrace("RAW", newLoc)
+
         // 1. FILTER ACCURACY
-        if (newLoc.accuracy > 20f) return null
+        if (newLoc.accuracy > 30f) {
+//            saveGpsTrace("REJECT", newLoc)
+            return null
+        }
         val last = lastAccepted
         if (last == null) {
+//            saveGpsTrace("ACCEPT", newLoc)
             lastAccepted = newLoc
             return newLoc
         }
@@ -456,9 +497,13 @@ class PersonelViewModel(
         }
 
         // --- OUTLIER FILTER ---
-        val maxJump = 8f + 2f * dt
+        val maxJump = 50f + 5f * dt
         if (dist > maxJump) {
-            Log.d("FILTER", "OUTLIER: $dist")
+//            saveGpsTrace("OUTLIER", newLoc)
+            Log.d(
+                "GPS_FILTER",
+                "OUTLIER dist=$dist maxJump=$maxJump dt=$dt"
+            )
             return null
         }
 
@@ -473,6 +518,12 @@ class PersonelViewModel(
             val blended = newLoc.copy(lat = blendedLat, lon = blendedLon)
             val finalLoc = smooth(blended, dt)
 
+            Log.d(
+                "GPS_ACCEPT",
+                "lat=${finalLoc.lat}, lon=${finalLoc.lon}, acc=${finalLoc.accuracy}"
+            )
+
+//            saveGpsTrace("ACCEPT", finalLoc)
             lastAccepted = finalLoc
             return finalLoc
         }
@@ -498,6 +549,9 @@ class PersonelViewModel(
         } else {
             blended
         }
+
+//        saveGpsTrace("ACCEPT", finalLoc)
+
         lastAccepted = finalLoc
         return finalLoc
     }
@@ -530,19 +584,26 @@ class PersonelViewModel(
 
     // ─── HEART RATE (BLE) ────────────────────────────────────────────────────
 
-    fun updateHeartRate(bpm: Int, deviceName: String = "") {
+    fun updateHeartRate(
+        bpm: Int,
+        deviceName: String = "",
+        timestamp: Long = System.currentTimeMillis()
+    ) {
         _heartRateState.update {
             it.copy(
                 bpm        = bpm,
-                timestamp  = System.currentTimeMillis(),
+                timestamp  = timestamp,
                 deviceName = deviceName.ifEmpty { it.deviceName }
             )
         }
 
         val app = getApplication<Application>()
         if (app is com.example.personeltracking2026.App) {
-            app.currentHeartRate   = bpm
-            app.currentHeartRateTs = System.currentTimeMillis()
+            app.updateHeartRateFromBle(
+                bpm = bpm,
+                nowMs = timestamp,
+                source = "PERSONEL_VM"
+            )
         }
         Log.d("HR_DEBUG", "UPDATE HR = $bpm")
     }
@@ -558,15 +619,7 @@ class PersonelViewModel(
     // ─── BATTERY ─────────────────────────────────────────────────────────────
 
     suspend fun refreshBattery() = withContext(Dispatchers.IO) {
-        val bm = getApplication<Application>()
-            .getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        val percent    = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        val isCharging = bm.isCharging
-        if (percent > 0) {
-            withContext(Dispatchers.Main) {
-                _batteryState.value = BatteryState(percent, isCharging)
-            }
-        }
+        (getApplication<Application>() as App).refreshBatteryFromSystem()
     }
 
     // ─── LEGACY ──────────────────────────────────────────────────────────────

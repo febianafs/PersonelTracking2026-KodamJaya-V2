@@ -77,7 +77,7 @@ class PersonelActivity : BaseActivity() {
     private lateinit var binding: ActivityPersonelBinding
     private lateinit var mqttPrefs: SharedPreferences
     private lateinit var sessionManager: SessionManager
-    private lateinit var mapView: MapView
+//    private lateinit var mapView: MapView
     private lateinit var pagerAdapter: TopPagerAdapter
     private lateinit var reconnectManager: MqttReconnectManager
 
@@ -102,6 +102,9 @@ class PersonelActivity : BaseActivity() {
     private var geoJsonSource: GeoJsonSource? = null
     private var lastAccepted: LocationData? = null
     private val smoothWindow = ArrayDeque<LocationData>()
+    private var activeVitalHolder: TopPagerAdapter.VitalVH? = null
+
+    private var isMapStyleReady = false
 
     // ─── SOS ─────────────────────────────────────────────────────────────────
     private var markerBlinkJob: Job? = null
@@ -114,6 +117,7 @@ class PersonelActivity : BaseActivity() {
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
+            startTrackingAfterLocationPermission()
             requestBackgroundLocation()
         }
         else Toast.makeText(this, "Location permission required", Toast.LENGTH_LONG).show()
@@ -140,21 +144,30 @@ class PersonelActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
-        MapLibre.getInstance(
-            this,
-            null,
-            org.maplibre.android.WellKnownTileServer.MapLibre
-        )
-
         binding        = ActivityPersonelBinding.inflate(layoutInflater)
         sessionManager = SessionManager(this)
         mqttPrefs      = getSharedPreferences("mqtt_settings", MODE_PRIVATE)
 
         setContentView(binding.root)
 
+        // WAJIB: MapView butuh onCreate manual dengan savedInstanceState yang benar
+//        binding.mapView.onCreate(savedInstanceState)
+
+        // Baca map type DULU sebelum setupMap
+        val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
+            .getString("map_type", MapTypeManager.MapType.STANDARD.name)
+        currentMapType = MapTypeManager.MapType.values()
+            .firstOrNull { it.name == savedType }
+            ?: MapTypeManager.MapType.STANDARD
+
+//        setupMap()
+
         requestBatteryOptimizationExemption()
 
         pagerAdapter = TopPagerAdapter()
+        pagerAdapter.onVitalHolderAttached = { holder ->
+            activeVitalHolder = holder
+        }
         binding.viewPagerTop.adapter = pagerAdapter
 
         binding.indicator?.setViewPager(binding.viewPagerTop)
@@ -173,17 +186,6 @@ class PersonelActivity : BaseActivity() {
 
         reconnectManager = MqttReconnectManager(this, viewModel.mqttManager)
 
-        val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
-            .getString("map_type", MapTypeManager.MapType.STANDARD.name)
-
-        val newType = MapTypeManager.MapType.values()
-            .firstOrNull { it.name == savedType }
-            ?: MapTypeManager.MapType.STANDARD
-
-        currentMapType = newType
-
-        setupMap()
-
         val deviceManager = DeviceIdentityManager(this)
         val identity = deviceManager.getIdentity()
 
@@ -192,13 +194,8 @@ class PersonelActivity : BaseActivity() {
         }
 
         val app = application as App
-
         app.currentMode = DeviceMode.RADIO
 
-        // FIX: SosManager di-init ulang di sini dengan locationProvider
-        // yang membaca koordinat dari App level (bukan hanya dari PersonelActivity)
-        // Ini memastikan SosManager selalu punya koordinat terbaru,
-        // bahkan saat SOS dipencet dari SettingsActivity
         SosManager.init(
             mqtt             = app.mqttManager,
             session          = sessionManager,
@@ -208,17 +205,17 @@ class PersonelActivity : BaseActivity() {
             locationProvider = { Triple(app.currentLat, app.currentLon, app.currentAccuracy) }
         )
 
-        binding.btnZoomIn.setOnClickListener {
-            mapLibreMap?.animateCamera(
-                org.maplibre.android.camera.CameraUpdateFactory.zoomIn()
-            )
-        }
-
-        binding.btnZoomOut.setOnClickListener {
-            mapLibreMap?.animateCamera(
-                org.maplibre.android.camera.CameraUpdateFactory.zoomOut()
-            )
-        }
+//        binding.btnZoomIn.setOnClickListener {
+//            mapLibreMap?.animateCamera(
+//                org.maplibre.android.camera.CameraUpdateFactory.zoomIn()
+//            )
+//        }
+//
+//        binding.btnZoomOut.setOnClickListener {
+//            mapLibreMap?.animateCamera(
+//                org.maplibre.android.camera.CameraUpdateFactory.zoomOut()
+//            )
+//        }
 
         setupVitalSignsInitial()
         updateMqttUI()
@@ -229,11 +226,16 @@ class PersonelActivity : BaseActivity() {
         requestLocationPermission()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+//        binding.mapView.onSaveInstanceState(outState)
+    }
+
     override fun onStart() {
         super.onStart()
 
         viewModel.registerBatteryReceiver(this)
-        binding.mapView.onStart()
+//        binding.mapView.onStart()
         updateMqttUI()
 
         val granted = ContextCompat.checkSelfPermission(
@@ -244,6 +246,10 @@ class PersonelActivity : BaseActivity() {
             requestLocationPermission()
             return
         }
+        startTrackingAfterLocationPermission()
+    }
+
+    private fun startTrackingAfterLocationPermission() {
         lifecycleScope.launch(Dispatchers.IO) {
             reconnectManager.start()
         }
@@ -260,25 +266,25 @@ class PersonelActivity : BaseActivity() {
         reconnectManager.stop()
 
         viewModel.unregisterBatteryReceiver(this)
-        binding.mapView.onStop()
+//        binding.mapView.onStop()
     }
 
     override fun onResume() {
         super.onResume()
         (application as App).currentMode = DeviceMode.RADIO
         SessionManager(this).saveLastScreen(LastScreen.PERSONEL)
-        binding.mapView.onResume()
+//        binding.mapView.onResume()
         val savedType = getSharedPreferences("map_settings", MODE_PRIVATE)
             .getString("map_type", MapTypeManager.MapType.STANDARD.name)
 
-        val newType = MapTypeManager.MapType.values()
-            .firstOrNull { it.name == savedType }
-            ?: MapTypeManager.MapType.STANDARD
-
-        if (newType != currentMapType) {
-            currentMapType = newType
-            applyMapType(newType)
-        }
+//        val newType = MapTypeManager.MapType.values()
+//            .firstOrNull { it.name == savedType }
+//            ?: MapTypeManager.MapType.STANDARD
+//
+//        if (newType != currentMapType) {
+//            currentMapType = newType
+//            applyMapType(newType)
+//        }
 
         val interval = parseIntervalToMs(
             mqttPrefs.getString("interval", "5 seconds") ?: "5 seconds"
@@ -301,18 +307,18 @@ class PersonelActivity : BaseActivity() {
 
     override fun onPause() {
         super.onPause()
-        binding.mapView.onPause()
+//        binding.mapView.onPause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         markerBlinkJob?.cancel()
-        binding.mapView.onDestroy()
+//        binding.mapView.onDestroy()
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
-        binding.mapView.onLowMemory()
+//        binding.mapView.onLowMemory()
     }
 
     // ─── OBSERVERS ───────────────────────────────────────────────────────────
@@ -335,6 +341,10 @@ class PersonelActivity : BaseActivity() {
                 // Lokasi GPS
                 launch {
                     viewModel.locationState.collect { state ->
+                        Log.d(
+                            "GPS_DEBUG",
+                            "GPS lat=${state.data?.lat} lon=${state.data?.lon}"
+                        )
 
                         val accuracy = state.data?.accuracy ?: Float.MAX_VALUE
 
@@ -357,19 +367,17 @@ class PersonelActivity : BaseActivity() {
                         }
 
                         state.data?.let {
+
+                            Log.d(
+                                "GPS_DEBUG",
+                                "LOCATION RECEIVED lat=${it.lat} lon=${it.lon} acc=${it.accuracy}"
+                            )
+
                             updateCoordinates(it.lat, it.lon)
 
-                            // FIX: Update koordinat ke App level
-                            // agar SosManager bisa baca koordinat terbaru
-                            // dari Activity manapun (termasuk SettingsActivity)
-                            val app = application as App
-                            app.currentLat      = it.lat
-                            app.currentLon      = it.lon
-                            app.currentAccuracy = it.accuracy
-
-                            if (!SosManager.isActive.value) {
-                                updateMarker(it.lat, it.lon)
-                            }
+//                            if (!SosManager.isActive.value) {
+//                                updateMarker(it.lat, it.lon)
+//                            }
                             pagerAdapter.latitude = it.lat
                             pagerAdapter.longitude = it.lon
                             pagerAdapter.notifyItemChanged(0)
@@ -401,6 +409,8 @@ class PersonelActivity : BaseActivity() {
                                 pagerAdapter.name = sessionManager.getName() ?: "-"
                                 pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
                                 pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+                                pagerAdapter.unit = sessionManager.getUnit().ifBlank { "-" }
+                                pagerAdapter.squad = sessionManager.getRegu().ifBlank { "-" }
 
                                 pagerAdapter.notifyItemChanged(0)
                             }
@@ -446,36 +456,20 @@ class PersonelActivity : BaseActivity() {
                         }
                     }
 
-                    // Observe BPM realtime
-//                    launch {
-//                        BluetoothLeService.bpmValue.collect { bpm ->
-//                            val app = application as App
-//                            // simpan HR terbaru
-//                            app.currentHeartRate = bpm
-//                            app.currentHeartRateTs = System.currentTimeMillis()
-//                            // update ViewModel untuk MQTT
-//                            viewModel.updateHeartRate(
-//                                bpm = bpm,
-//                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
-//                            )
-//                        }
-//                    }
-
-                    // Refresh UI + cek expired
                     launch {
-
-                        while (true) {
-                            val app = application as App
-                            val isExpired =
-                                System.currentTimeMillis() - app.currentHeartRateTs > 30_000
-                            val finalHr = if (isExpired) 0 else app.currentHeartRate
-                            pagerAdapter.bleBpm = finalHr
-                            pagerAdapter.notifyItemChanged(1)
-                            delay(1000)
+                        BluetoothLeService.bpmReading.collect { reading ->
+                            viewModel.updateHeartRate(
+                                bpm = reading.bpm,
+                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: "",
+                                timestamp = reading.timestamp
+                            )
                         }
-                        BluetoothLeService.bpmValue.collect { bpm ->
-                            pagerAdapter.bleBpm = bpm
-                            pagerAdapter.notifyItemChanged(1)
+                    }
+
+                    launch {
+                        val app = application as App
+                        app.effectiveHeartRate.collect { bpm ->
+                            updateBleBpmUi(bpm = bpm, force = true)
                         }
                     }
                 }
@@ -490,7 +484,7 @@ class PersonelActivity : BaseActivity() {
         markerBlinkJob = lifecycleScope.launch {
             var toggle = false
             while (SosManager.isActive.value) {
-                updateMarkerWithColor(toggle)
+//                updateMarkerWithColor(toggle)
                 toggle = !toggle
                 delay(500)
             }
@@ -500,7 +494,7 @@ class PersonelActivity : BaseActivity() {
     private fun stopMarkerBlink() {
         markerBlinkJob?.cancel()
         markerBlinkJob = null
-        updateMarkerWithColor(true)
+//        updateMarkerWithColor(true)
     }
 
     // ─── PERSONEL ────────────────────────────────────────────────────────────
@@ -548,8 +542,24 @@ class PersonelActivity : BaseActivity() {
         pagerAdapter.nrp = data.nrp
             ?: sessionManager.getNrp().ifBlank { "-" }
 
-        pagerAdapter.rank = data.rank?.name
-            ?: sessionManager.getRank().ifBlank { "-" }
+        val finalRank = data.getClassification("Rank")
+            .ifBlank { data.rank?.name ?: "" }
+            .ifBlank { sessionManager.getRank() }
+            .ifBlank { "-" }
+
+        val finalUnit = data.getClassification("Unit")
+            .ifBlank { data.unit?.name ?: "" }
+            .ifBlank { sessionManager.getUnit() }
+            .ifBlank { "-" }
+
+        val finalSquad = data.getClassification("Regu")
+            .ifBlank { data.regu?.name ?: "" }
+            .ifBlank { sessionManager.getRegu() }
+            .ifBlank { "-" }
+
+        pagerAdapter.rank = finalRank
+        pagerAdapter.unit = finalUnit
+        pagerAdapter.squad = finalSquad
 
         pagerAdapter.notifyItemChanged(0)
     }
@@ -557,6 +567,19 @@ class PersonelActivity : BaseActivity() {
     private fun updateBattery(percent: Int) {
         pagerAdapter.battery = percent
         pagerAdapter.notifyItemChanged(1)
+    }
+
+    private fun updateBleBpmUi(
+        bpm: Int = (application as App).getHeartRateSnapshot().bpm,
+        force: Boolean = false
+    ) {
+        val app = application as App
+
+        if (force || pagerAdapter.bleBpm != bpm) {
+            pagerAdapter.setBleBpmRealtime(bpm)
+            activeVitalHolder?.updateBpm(bpm)
+            Log.d("HR_UI", "UI BPM=$bpm raw=${app.currentHeartRate} ts=${app.currentHeartRateTs}")
+        }
     }
 
     private fun personelBottomSheet() {
@@ -617,124 +640,140 @@ class PersonelActivity : BaseActivity() {
 
     // ─── MAP ─────────────────────────────────────────────────────────────────
 
-    private fun setupMap() {
-        mapView = binding.mapView
-        mapView.onCreate(null)
+//    private fun setupMap() {
+//
+//        Log.d("MAP_DEBUG", "setupMap START")
+//
+////        mapView = binding.mapView
+////        mapView.onCreate(null)
+//
+//        mapView.getMapAsync { map ->
+//
+//            Log.d("MAP_DEBUG", "getMapAsync")
+//            mapLibreMap = map
+//
+//            val styleUrl = MapTypeManager.getStyleUrl(currentMapType)
+//            map.setStyle(
+//                Style.Builder().fromUri(styleUrl)
+//            ) { style ->
+//
+//                if (isMapStyleReady) return@setStyle
+//                isMapStyleReady = true
+//
+//                Log.d("MAP_DEBUG", "STYLE LOADED")
+//
+//                val point = LatLng(currentLat, currentLon)
+//
+//                map.cameraPosition = CameraPosition.Builder()
+//                    .target(point)
+//                    .zoom(12.0)
+//                    .build()
+//
+//
+//                geoJsonSource = GeoJsonSource(
+//                    "personel-source",
+//                    Point.fromLngLat(currentLon, currentLat)
+//                )
+//                style.addSource(geoJsonSource!!)
+//
+//                val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+//                drawableRed.setTint(Color.parseColor("#FF1744"))
+//                val bitmapRed = drawableToBitmap(drawableRed)
+//
+//                style.addImage("marker-red", bitmapRed)
+//
+//                val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+//                drawablePink.setTint(Color.parseColor("#FF8A80"))
+//                val bitmapPink = drawableToBitmap(drawablePink)
+//
+//                style.addImage("marker-pink", bitmapPink)
+//
+//                val symbolLayer = SymbolLayer("personel-layer", "personel-source")
+//                    .withProperties(
+//                        iconImage("marker-red"),
+//                        iconAllowOverlap(true),
+//                        iconIgnorePlacement(true)
+//                    )
+//                style.addLayer(symbolLayer)
+//
+//                Log.d("MAP_DEBUG", "Sources: ${style.sources.map { it.id }}")
+//                Log.d("MAP_DEBUG", "Layers: ${style.layers.map { it.id }}")
+//            }
+//        }
+//        Log.d("INIT", "MAP READY")
+//    }
 
-        mapView.getMapAsync { map ->
-            mapLibreMap = map
+//    private fun updateMarker(lat: Double, lon: Double) {
+//
+//        Log.d(
+//            "MARKER_DEBUG",
+//            "MOVE MARKER lat=$lat lon=$lon"
+//        )
+//
+//        geoJsonSource?.setGeoJson(
+//            Point.fromLngLat(lon, lat)
+//        )
+//
+//        val newLoc = LocationData(lat, lon, 0f, "")
+//        val last = lastAccepted
+//
+//        if (last == null || distance(last, newLoc) > 5) {
+//            mapLibreMap?.moveCamera(
+//                CameraUpdateFactory.newLatLng(LatLng(lat, lon))
+//            )
+//            lastAccepted = newLoc
+//        }
+//    }
 
-            val styleUrl = MapTypeManager.getStyleUrl(currentMapType)
-            map.setStyle(
-                Style.Builder().fromUri(styleUrl)
-            ) {
-                val point = LatLng(currentLat, currentLon)
-
-                map.cameraPosition = CameraPosition.Builder()
-                    .target(point)
-                    .zoom(15.0)
-                    .build()
-
-                val style = it
-
-                geoJsonSource = GeoJsonSource(
-                    "personel-source",
-                    Point.fromLngLat(currentLon, currentLat)
-                )
-                style.addSource(geoJsonSource!!)
-
-                val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
-                drawableRed.setTint(Color.parseColor("#FF1744"))
-                val bitmapRed = drawableToBitmap(drawableRed)
-
-                style.addImage("marker-red", bitmapRed)
-
-                val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
-                drawablePink.setTint(Color.parseColor("#FF8A80"))
-                val bitmapPink = drawableToBitmap(drawablePink)
-
-                style.addImage("marker-pink", bitmapPink)
-
-                val symbolLayer = SymbolLayer("personel-layer", "personel-source")
-                    .withProperties(
-                        iconImage("marker-red"),
-                        iconAllowOverlap(true),
-                        iconIgnorePlacement(true)
-                    )
-                style.addLayer(symbolLayer)
-            }
-        }
-        Log.d("INIT", "MAP READY")
-    }
-
-    private fun updateMarker(lat: Double, lon: Double) {
-        geoJsonSource?.setGeoJson(
-            Point.fromLngLat(lon, lat)
-        )
-
-        val newLoc = LocationData(lat, lon, 0f, "")
-        val last = lastAccepted
-
-        if (last == null || distance(last, newLoc) > 5) {
-            mapLibreMap?.moveCamera(
-                CameraUpdateFactory.newLatLng(LatLng(lat, lon))
-            )
-            lastAccepted = newLoc
-        }
-    }
-
-    private fun updateMarkerWithColor(useRed: Boolean) {
-        val layer = mapLibreMap?.style?.getLayer("personel-layer") as? SymbolLayer
-
-        layer?.setProperties(
-            iconImage(if (useRed) "marker-red" else "marker-pink")
-        )
-    }
+//    private fun updateMarkerWithColor(useRed: Boolean) {
+//        val layer = mapLibreMap?.style?.getLayer("personel-layer") as? SymbolLayer
+//
+//        layer?.setProperties(
+//            iconImage(if (useRed) "marker-red" else "marker-pink")
+//        )
+//    }
 
     private fun updateCoordinates(lat: Double, lon: Double) {
         currentLat = lat
         currentLon = lon
-
-        binding.tvCoordinates.text  = "$lat,"
-        binding.tvCoordinates2.text = " $lon"
     }
 
-    private fun applyMapType(type: MapTypeManager.MapType) {
-        val map = mapLibreMap ?: return
-
-        val currentCamera = map.cameraPosition
-        val styleUrl = MapTypeManager.getStyleUrl(type)
-
-        map.setStyle(
-            Style.Builder().fromUri(styleUrl)
-        ) { style ->
-
-            map.cameraPosition = currentCamera
-
-            geoJsonSource = GeoJsonSource(
-                "personel-source",
-                Point.fromLngLat(currentLon, currentLat)
-            )
-            style.addSource(geoJsonSource!!)
-
-            val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
-            drawableRed.setTint(Color.parseColor("#FF1744"))
-            style.addImage("marker-red", drawableToBitmap(drawableRed))
-
-            val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
-            drawablePink.setTint(Color.parseColor("#FF8A80"))
-            style.addImage("marker-pink", drawableToBitmap(drawablePink))
-
-            val symbolLayer = SymbolLayer("personel-layer", "personel-source")
-                .withProperties(
-                    iconImage("marker-red"),
-                    iconAllowOverlap(true),
-                    iconIgnorePlacement(true)
-                )
-
-            style.addLayer(symbolLayer)
-        }
-    }
+//    private fun applyMapType(type: MapTypeManager.MapType) {
+//        val map = mapLibreMap ?: return
+//
+//        val currentCamera = map.cameraPosition
+//        val styleUrl = MapTypeManager.getStyleUrl(type)
+//
+//        map.setStyle(
+//            Style.Builder().fromUri(styleUrl)
+//        ) { style ->
+//
+//            map.cameraPosition = currentCamera
+//
+//            geoJsonSource = GeoJsonSource(
+//                "personel-source",
+//                Point.fromLngLat(currentLon, currentLat)
+//            )
+//            style.addSource(geoJsonSource!!)
+//
+//            val drawableRed = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+//            drawableRed.setTint(Color.parseColor("#FF1744"))
+//            style.addImage("marker-red", drawableToBitmap(drawableRed))
+//
+//            val drawablePink = ContextCompat.getDrawable(this, R.drawable.ic_location_pin)!!
+//            drawablePink.setTint(Color.parseColor("#FF8A80"))
+//            style.addImage("marker-pink", drawableToBitmap(drawablePink))
+//
+//            val symbolLayer = SymbolLayer("personel-layer", "personel-source")
+//                .withProperties(
+//                    iconImage("marker-red"),
+//                    iconAllowOverlap(true),
+//                    iconIgnorePlacement(true)
+//                )
+//
+//            style.addLayer(symbolLayer)
+//        }
+//    }
 
     // ─── LOCATION ────────────────────────────────────────────────────────────
 
@@ -803,7 +842,7 @@ class PersonelActivity : BaseActivity() {
         val config = MqttConfigManager(this).load()
 
         pagerAdapter.mqttHost = config.host ?: "-"
-        pagerAdapter.mqttPort = config.tcpPort.toString()
+        pagerAdapter.mqttPort = config.wsPort.toString()
         pagerAdapter.interval = mqttPrefs.getString("interval", "5 seconds") ?: "5 seconds"
 
         pagerAdapter.notifyItemChanged(2)
@@ -813,14 +852,14 @@ class PersonelActivity : BaseActivity() {
 
     private fun setupClickListeners() {
 
-        binding.btnFullMap.setOnClickListener {
-            val intent = Intent(this, FullscreenMapActivity::class.java)
-            intent.putExtra("lat", currentLat)
-            intent.putExtra("lon", currentLon)
-            intent.putExtra("mapType", currentMapType.name)
-
-            startActivity(intent)
-        }
+//        binding.btnFullMap.setOnClickListener {
+//            val intent = Intent(this, FullscreenMapActivity::class.java)
+//            intent.putExtra("lat", currentLat)
+//            intent.putExtra("lon", currentLon)
+//            intent.putExtra("mapType", currentMapType.name)
+//
+//            startActivity(intent)
+//        }
     }
 
     // ─── SWIPE REFRESH ───────────────────────────────────────────────────────

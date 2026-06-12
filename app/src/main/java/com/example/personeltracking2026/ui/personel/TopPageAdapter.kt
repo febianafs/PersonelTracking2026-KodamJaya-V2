@@ -12,6 +12,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.personeltracking2026.R
 import com.example.personeltracking2026.ui.settings.SettingsActivity
+import java.util.Locale
 
 class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -24,6 +25,8 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     var name: String = "-"
     var nrp: String = "-"
     var rank: String = "-"
+    var unit: String = "-"
+    var squad: String = "-"
     var avatarUrl: String? = null
     var lastSync: String = "-"
     var latitude: Double = 0.0
@@ -41,6 +44,9 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
     var bleDeviceName: String = "--"          // nama device terhubung
     var bleConnected: Boolean = false         // status koneksi
     var bleBpm: Int = 0                       // BPM realtime
+
+    private var vitalHolder: VitalVH? = null
+    var onVitalHolderAttached: ((VitalVH?) -> Unit)? = null
 
     override fun getItemCount() = 3
 
@@ -81,6 +87,8 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                 name,
                 nrp,
                 rank,
+                unit,
+                squad,
                 latitude,
                 longitude,
                 battery,
@@ -94,6 +102,28 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         }
     }
 
+    override fun onViewAttachedToWindow(holder: RecyclerView.ViewHolder) {
+        super.onViewAttachedToWindow(holder)
+        if (holder is VitalVH) {
+            vitalHolder = holder
+            holder.updateBpm(bleBpm)
+            onVitalHolderAttached?.invoke(holder)
+        }
+    }
+
+    override fun onViewDetachedFromWindow(holder: RecyclerView.ViewHolder) {
+        if (holder == vitalHolder) {
+            vitalHolder = null
+            onVitalHolderAttached?.invoke(null)
+        }
+        super.onViewDetachedFromWindow(holder)
+    }
+
+    fun setBleBpmRealtime(bpm: Int) {
+        bleBpm = bpm
+        vitalHolder?.updateBpm(bpm)
+    }
+
     // ══════════════════════════════════════════════════════════════════════
     // VIEW HOLDERS
     // ══════════════════════════════════════════════════════════════════════
@@ -103,15 +133,21 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         private val tvName     = itemView.findViewById<TextView?>(R.id.tvName)
         private val tvNRP      = itemView.findViewById<TextView?>(R.id.tvNRP)
         private val tvRank     = itemView.findViewById<TextView>(R.id.tvRank)
+        private val tvUnit     = itemView.findViewById<TextView?>(R.id.tvUnit)
+        private val tvSquad    = itemView.findViewById<TextView?>(R.id.tvSquad)
         private val tvBattery  = itemView.findViewById<TextView?>(R.id.tvBattery)
         private val tvLastSync = itemView.findViewById<TextView?>(R.id.tvLastSync)
+        private val tvCoordinates = itemView.findViewById<TextView?>(R.id.tvCoordinates)
+        private val tvCoordinates2 = itemView.findViewById<TextView?>(R.id.tvCoordinates2)
         private val dot        = itemView.findViewById<View>(R.id.dotLastSync)
-        private val btnFullData = itemView.findViewById<TextView>(R.id.btnDataSelengkapnya)
+        private val btnFullData = itemView.findViewById<TextView?>(R.id.btnDataSelengkapnya)
 
         fun bind(
             name: String,
             nrp: String,
             rank: String,
+            unit: String,
+            squad: String,
             latitude: Double,
             longitude: Double,
             battery: Int,
@@ -123,8 +159,12 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             tvName?.text     = name
             tvNRP?.text      = nrp
             tvRank?.text     = rank
+            tvUnit?.text     = unit
+            tvSquad?.text    = squad
             tvBattery?.text  = "$battery%"
             tvLastSync?.text = lastSync
+            tvCoordinates?.text = String.format(Locale.US, "%.7f,", latitude)
+            tvCoordinates2?.text = String.format(Locale.US, "%.7f", longitude)
 
             imgAvatar?.let { imageView ->
                 val previousAvatarUrl = imageView.tag as? String
@@ -151,7 +191,7 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             tvLastSync?.setTextColor(parsedColor)
             dot.backgroundTintList = android.content.res.ColorStateList.valueOf(parsedColor)
 
-            btnFullData.setOnClickListener { onFullDataClick?.invoke() }
+            btnFullData?.setOnClickListener { onFullDataClick?.invoke() }
         }
     }
     class VitalVH(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -180,8 +220,8 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             dot.backgroundTintList = android.content.res.ColorStateList.valueOf(parsedColor)
 
             // ── BPM ───────────────────────────────────────────────────────
-            val displayBpm = if (bleBpm > 0) bleBpm else heartRate
-            tvHeartRate?.text = if (displayBpm > 0) "$displayBpm BPM" else "-- BPM"
+            val displayBpm = bleBpm
+            updateBpm(displayBpm)
 
             // ── Kategori BPM ──────────────────────────────────────────────
             val (categoryText, categoryColor) = when {
@@ -211,6 +251,10 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                     Intent(context, com.example.personeltracking2026.ui.bluetooth.BluetoothActivity::class.java)
                 )
             }
+        }
+
+        fun updateBpm(bpm: Int) {
+            tvHeartRate?.text = "$bpm BPM"
         }
     }
 

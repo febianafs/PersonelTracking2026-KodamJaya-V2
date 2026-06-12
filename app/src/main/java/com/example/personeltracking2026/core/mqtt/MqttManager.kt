@@ -42,16 +42,19 @@ class MqttManager(private val context: Context) {
     var onDisconnected   : (() -> Unit)?                                = null
     var onPublishSuccess : ((topic: String) -> Unit)?                   = null
     var onPublishFailed  : ((topic: String, reason: String) -> Unit)?   = null
+    var onSosMessageReceived : ((topic: String, payload: String) -> Unit)? = null
 
     private val scope = CoroutineScope(Dispatchers.IO)
 
     // FIX 1: Baca topic dari MqttTopicManager, bukan konstanta hardcoded
     private fun topics() = MqttTopicManager(context).load()
+    private var sosSubscriptionSelector: ((MqttTopicConfig) -> List<String>)? = null
 
     private var client             : Mqtt3AsyncClient? = null
     private var retryJob           : Job?              = null
     private var retryCount                             = 0
     private var isIntentionallyStopped                 = false
+    private var activeSosSubscriptionTopics: Set<String> = emptySet()
 
     // ─── PUBLIC ──────────────────────────────────────────────────────────────
 
@@ -106,6 +109,11 @@ class MqttManager(private val context: Context) {
     }
 
     fun isConnected(): Boolean = client?.state?.isConnected == true
+
+    fun setSosSubscriptionSelector(selector: (MqttTopicConfig) -> List<String>) {
+        sosSubscriptionSelector = selector
+        if (isConnected()) subscribeSosTopics()
+    }
 
     // FIX 1: Semua fungsi publish sekarang baca topic dari MqttTopicManager
     fun publishRadioData(payload: RadioDataPayload) {
@@ -178,6 +186,7 @@ class MqttManager(private val context: Context) {
             .applySimpleAuth()
 
         client = builder.buildAsync()
+        activeSosSubscriptionTopics = emptySet()
 
         client?.connect()
             ?.whenComplete { connAck: Mqtt3ConnAck?, throwable: Throwable? ->
@@ -191,6 +200,7 @@ class MqttManager(private val context: Context) {
                     val protocol = if (config.useWebSocket) "ws" else "tcp"
                     MqttLogger.connect("$protocol://$host:$port", retryCount > 0)
                     retryCount = 0
+                    subscribeSosTopics()
                     onConnected?.invoke()
                     scope.launch {
                         queueManager.flush(this@MqttManager)
@@ -273,6 +283,60 @@ class MqttManager(private val context: Context) {
                     onPublishSuccess?.invoke(topic)
                 }
             }
+    }
+
+    private fun subscribeSosTopics() {
+        val topicConfig = topics()
+        val sosTopics = (sosSubscriptionSelector?.invoke(topicConfig) ?: listOf(
+            topicConfig.personelSosTopic,
+            topicConfig.bodycamSosTopic
+        ))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .toSet()
+
+        val topicsToUnsubscribe = activeSosSubscriptionTopics - sosTopics
+        val topicsToSubscribe = sosTopics - activeSosSubscriptionTopics
+
+        topicsToUnsubscribe.forEach { topic ->
+            client?.unsubscribeWith()
+                ?.topicFilter(topic)
+                ?.send()
+                ?.whenComplete { _, throwable ->
+                    if (throwable != null) {
+                        MqttLogger.error("Unsubscribe failed ($topic): ${throwable.message}")
+                    } else {
+                        Log.d(TAG, "Unsubscribed SOS topic: $topic")
+                    }
+                }
+        }
+
+        topicsToSubscribe.forEach { topic ->
+            client?.subscribeWith()
+                ?.topicFilter(topic)
+                ?.qos(MqttQos.EXACTLY_ONCE)
+                ?.callback { mqttPublish ->
+                    if (mqttPublish.isRetain) {
+                        Log.d(TAG, "Ignored retained SOS message: $topic")
+                        return@callback
+                    }
+
+                    val payload = String(mqttPublish.payloadAsBytes, StandardCharsets.UTF_8)
+                    MqttLogger.receive(topic, payload)
+                    onSosMessageReceived?.invoke(topic, payload)
+                }
+                ?.send()
+                ?.whenComplete { _, throwable ->
+                    if (throwable != null) {
+                        MqttLogger.error("Subscribe failed ($topic): ${throwable.message}")
+                    } else {
+                        Log.d(TAG, "Subscribed SOS topic: $topic")
+                    }
+                }
+        }
+
+        activeSosSubscriptionTopics = sosTopics
     }
 
     private fun scheduleRetry() {

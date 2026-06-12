@@ -14,8 +14,13 @@ import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import com.example.personeltracking2026.R
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+
+data class HeartRateReading(
+    val bpm: Int,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 class BluetoothLeService : Service() {
 
@@ -26,12 +31,19 @@ class BluetoothLeService : Service() {
 
         val connectionState = MutableStateFlow(ConnectionState.DISCONNECTED)
         val bpmValue        = MutableStateFlow(0)
+        val bpmReading      = MutableSharedFlow<HeartRateReading>(extraBufferCapacity = 64)
         val connectedDevice = MutableStateFlow<BluetoothDeviceModel?>(null)
 
         // UUID Heart Rate
         val HEART_RATE_SERVICE  = java.util.UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb")
         val HEART_RATE_CHAR     = java.util.UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb")
         val CLIENT_CHAR_CONFIG  = java.util.UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+
+        fun publishBpm(bpm: Int) {
+            val normalizedBpm = bpm.coerceAtLeast(0)
+            bpmValue.value = normalizedBpm
+            bpmReading.tryEmit(HeartRateReading(normalizedBpm))
+        }
     }
 
     enum class ConnectionState { DISCONNECTED, CONNECTING, CONNECTED }
@@ -44,6 +56,7 @@ class BluetoothLeService : Service() {
 
     private var bluetoothGatt: BluetoothGatt? = null
     private var currentDeviceAddress: String? = null
+    private var lastContactLostRawBpm: Int? = null
 
     // ══════════════════════════════════════════════════════════════════════
     // LIFECYCLE SERVICE
@@ -101,7 +114,7 @@ class BluetoothLeService : Service() {
         bluetoothGatt = null
         currentDeviceAddress = null
         connectionState.value = ConnectionState.DISCONNECTED
-        bpmValue.value = 0
+        publishBpm(0)
         connectedDevice.value = null
         updateNotification("Bluetooth standby")
     }
@@ -119,14 +132,18 @@ class BluetoothLeService : Service() {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.d(TAG, "GATT Connected")
-                    try { gatt.discoverServices() } catch (e: SecurityException) { }
+                    try {
+                        gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+                        gatt.discoverServices()
+                    } catch (e: SecurityException) { }
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     gatt.close()
                     bluetoothGatt = null
+                    lastContactLostRawBpm = null
                     Log.d(TAG, "GATT Disconnected")
                     connectionState.value = ConnectionState.DISCONNECTED
-                    bpmValue.value = 0
+                    publishBpm(0)
                     connectedDevice.value = null
                     updateNotification("Bluetooth standby")
                 }
@@ -139,6 +156,9 @@ class BluetoothLeService : Service() {
             connectionState.value = ConnectionState.CONNECTED
             connectedDevice.value = connectedDevice.value?.copy(state = DeviceState.CONNECTED)
             updateNotification("Terhubung ke ${connectedDevice.value?.name ?: "device"}")
+            try {
+                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+            } catch (e: SecurityException) { }
 
             // Subscribe heart rate notification
             val service = gatt.getService(HEART_RATE_SERVICE) ?: return
@@ -164,14 +184,41 @@ class BluetoothLeService : Service() {
             }
 
             if (characteristic.uuid == HEART_RATE_CHAR) {
-                val flag = characteristic.properties
-                val bpm = if (flag and 0x01 != 0) {
+                val payload = characteristic.value ?: return
+                if (payload.isEmpty()) return
+
+                val flags = payload[0].toInt()
+                val isUint16 = flags and 0x01 != 0
+                val sensorContactSupported = flags and 0x04 != 0
+                val sensorContactDetected = flags and 0x02 != 0
+
+                val measuredBpm = if (isUint16) {
                     characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT16, 1) ?: 0
                 } else {
                     characteristic.getIntValue(BluetoothGattCharacteristic.FORMAT_UINT8, 1) ?: 0
                 }
-                bpmValue.value = bpm
-                Log.d(TAG, "BPM: $bpm")
+
+                val currentBpm = bpmValue.value
+                val effectiveBpm = when {
+                    measuredBpm <= 0 -> 0
+                    sensorContactSupported && !sensorContactDetected && currentBpm > 0 -> {
+                        lastContactLostRawBpm = measuredBpm
+                        0
+                    }
+                    sensorContactSupported && !sensorContactDetected &&
+                            lastContactLostRawBpm == measuredBpm -> 0
+                    else -> measuredBpm
+                }
+
+                if (effectiveBpm > 0) {
+                    lastContactLostRawBpm = null
+                }
+
+                publishBpm(effectiveBpm)
+                Log.d(
+                    TAG,
+                    "BPM raw=$measuredBpm effective=$effectiveBpm contactSupported=$sensorContactSupported contactDetected=$sensorContactDetected"
+                )
             }
         }
     }
