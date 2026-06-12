@@ -19,7 +19,6 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -31,7 +30,6 @@ import com.example.personeltracking2026.core.sos.SosManager
 import com.example.personeltracking2026.ui.settings.SettingsActivity
 import com.example.personeltracking2026.utils.DeviceIdentityManager
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class BluetoothActivity : BaseActivity() {
@@ -80,6 +78,7 @@ class BluetoothActivity : BaseActivity() {
     private val deviceList = mutableListOf<BluetoothDeviceModel>()
     private lateinit var adapter: BluetoothDeviceAdapter
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var hasRequestedInitialPermission = false
 
     // ══════════════════════════════════════════════════════════════════════
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -107,10 +106,13 @@ class BluetoothActivity : BaseActivity() {
         setupAdapter()
         setupListeners()
 
-        // Start & bind service
-        val serviceIntent = Intent(this, BluetoothLeService::class.java)
-        ContextCompat.startForegroundService(this, serviceIntent)
-        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
+        if (hasPermission()) {
+            ensureServiceBound()
+        } else {
+            showPermissionRequiredState()
+            requestPermissions()
+            hasRequestedInitialPermission = true
+        }
     }
 
     override fun onDestroy() {
@@ -150,8 +152,25 @@ class BluetoothActivity : BaseActivity() {
         adapter = BluetoothDeviceAdapter(
             context      = this,
             onConnect    = { device -> connectToDevice(device) },
-            onDisconnect = { _ -> bleService?.disconnect() }
+            onDisconnect = { _ ->
+                if (hasPermission()) {
+                    bleService?.disconnect()
+                } else {
+                    requestPermissions()
+                }
+            }
         )
+    }
+
+    private fun ensureServiceBound() {
+        if (isBound) {
+            syncUIWithService()
+            return
+        }
+
+        val serviceIntent = Intent(this, BluetoothLeService::class.java)
+        ContextCompat.startForegroundService(this, serviceIntent)
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -182,27 +201,23 @@ class BluetoothActivity : BaseActivity() {
         }
 
         lifecycleScope.launch {
-            BluetoothLeService.bpmValue.collect { bpm ->
-                if (bpm > 0) updateBpm(bpm)
-
-                val app = application as App
-                app.currentHeartRate = bpm
-                app.currentHeartRateTs = System.currentTimeMillis()
-            }
-        }
-
-        lifecycleScope.launch {
-            while (true) {
-                val app = application as App
-                val isExpired = System.currentTimeMillis() - app.currentHeartRateTs > 30_000
-                val finalHr = if (isExpired) 0 else app.currentHeartRate
-                updateBpm(finalHr)
-                delay(1000)
+            val app = application as App
+            app.effectiveHeartRate.collect { bpm ->
+                updateBpm(bpm)
             }
         }
     }
 
     private fun syncUIWithService() {
+        if (!hasPermission()) {
+            showPermissionRequiredState()
+            if (!hasRequestedInitialPermission) {
+                requestPermissions()
+                hasRequestedInitialPermission = true
+            }
+            return
+        }
+
         val isBluetoothOn = bluetoothAdapter?.isEnabled == true
         switchBluetooth.setOnCheckedChangeListener(null)
         switchBluetooth.isChecked = isBluetoothOn
@@ -248,6 +263,8 @@ class BluetoothActivity : BaseActivity() {
                 deviceList.clear()
                 updateDeviceList()
                 startScan()
+            } else {
+                requestPermissions()
             }
         }
         setupSwitchListener()
@@ -257,7 +274,9 @@ class BluetoothActivity : BaseActivity() {
         switchBluetooth.setOnCheckedChangeListener { _, isChecked ->
             if (!hasPermission()) {
                 requestPermissions()
+                switchBluetooth.setOnCheckedChangeListener(null)
                 switchBluetooth.isChecked = !isChecked
+                setupSwitchListener()
                 return@setOnCheckedChangeListener
             }
 
@@ -293,6 +312,23 @@ class BluetoothActivity : BaseActivity() {
         bluetoothScanView.stopAnimation()
     }
 
+    private fun showPermissionRequiredState() {
+        stopScan()
+        deviceList.clear()
+        updateDeviceList()
+        switchBluetooth.setOnCheckedChangeListener(null)
+        switchBluetooth.isChecked = false
+        setupSwitchListener()
+        updateToggleUI(false)
+        layoutBluetoothOff.visibility = View.GONE
+        layoutScanning.visibility = View.VISIBLE
+        layoutConnectedInfo.visibility = View.GONE
+        layoutDeviceList.visibility = View.GONE
+        bluetoothScanView.stopAnimation()
+        tvDeviceCount.visibility = View.GONE
+        tvScanStatus.text = "Bluetooth permission required"
+    }
+
     private fun showScanningLayout() {
         layoutBluetoothOff.visibility = View.GONE
         layoutScanning.visibility     = View.VISIBLE
@@ -324,6 +360,7 @@ class BluetoothActivity : BaseActivity() {
     private fun updateBpm(bpm: Int) {
         tvBpm.text = bpm.toString()
         val (statusText, colorRes) = when {
+            bpm == 0 -> "--" to R.color.gray
             bpm < 60  -> "Below normal" to R.color.orange
             bpm > 100 -> "Above normal"  to R.color.red
             else      -> "Normal"           to R.color.gray
@@ -356,8 +393,23 @@ class BluetoothActivity : BaseActivity() {
     // ══════════════════════════════════════════════════════════════════════
 
     private fun startScan() {
-        if (!hasPermission()) return
+        if (!hasPermission()) {
+            requestPermissions()
+            return
+        }
+
+        if (bluetoothAdapter?.isEnabled != true) {
+            showOffState()
+            updateToggleUI(false)
+            return
+        }
+
         bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
+        if (bluetoothLeScanner == null) {
+            tvScanStatus.text = "Bluetooth scanner unavailable"
+            return
+        }
+
         isScanning = true
         tvScanStatus.text = "Searching for devices . . ."
         bluetoothScanView.startAnimation()
@@ -414,13 +466,78 @@ class BluetoothActivity : BaseActivity() {
     // ══════════════════════════════════════════════════════════════════════
 
     private fun connectToDevice(deviceModel: BluetoothDeviceModel) {
-        bleService?.disconnect()
+        val service = bleService
+        if (service == null) {
+            ensureServiceBound()
+            Toast.makeText(this, "Bluetooth service sedang disiapkan", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!hasPermission()) {
+            requestPermissions()
+            return
+        }
+
+        val btAdapter = bluetoothAdapter ?: run {
+            Toast.makeText(this, "Bluetooth tidak tersedia", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!btAdapter.isEnabled) {
+            val enableBtIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+            enableBluetoothLauncher.launch(enableBtIntent)
+            return
+        }
+
+        val connectionState = BluetoothLeService.connectionState.value
+        val connectedDevice = BluetoothLeService.connectedDevice.value
+
+        if (
+            connectedDevice?.address == deviceModel.address &&
+            connectionState == BluetoothLeService.ConnectionState.CONNECTED
+        ) {
+            return
+        }
+
+        if (
+            connectedDevice?.address == deviceModel.address &&
+            connectionState == BluetoothLeService.ConnectionState.CONNECTING
+        ) {
+            return
+        }
+
+        stopScan()
+        bluetoothScanView.stopAnimation()
+        tvScanStatus.text = "Connecting to ${deviceModel.name.ifBlank { "device" }}..."
+
+        deviceList.forEach { device ->
+            device.state = if (device.address == deviceModel.address) {
+                DeviceState.CONNECTING
+            } else {
+                DeviceState.IDLE
+            }
+        }
+        updateDeviceList()
+
         lifecycleScope.launch {
-            delay(300)
-            val btAdapter = bluetoothAdapter ?: return@launch
-            deviceModel.state = DeviceState.CONNECTING
-            updateDeviceList()
-            bleService?.connect(deviceModel, btAdapter)
+            val shouldDisconnectFirst =
+                connectionState != BluetoothLeService.ConnectionState.DISCONNECTED &&
+                        connectedDevice?.address != deviceModel.address
+
+            if (shouldDisconnectFirst) {
+                service.disconnect()
+                delay(500)
+                deviceList.forEach { device ->
+                    device.state = if (device.address == deviceModel.address) {
+                        DeviceState.CONNECTING
+                    } else {
+                        DeviceState.IDLE
+                    }
+                }
+                updateDeviceList()
+            }
+
+            service.connect(deviceModel.copy(state = DeviceState.CONNECTING), btAdapter)
         }
     }
 
@@ -429,22 +546,23 @@ class BluetoothActivity : BaseActivity() {
     // ══════════════════════════════════════════════════════════════════════
 
     private fun hasPermission(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_SCAN)    == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return requiredBluetoothPermissions().all { permission ->
+            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun requestPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            requestPermissionLauncher.launch(arrayOf(
+        requestPermissionLauncher.launch(requiredBluetoothPermissions())
+    }
+
+    private fun requiredBluetoothPermissions(): Array<String> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(
                 android.Manifest.permission.BLUETOOTH_SCAN,
                 android.Manifest.permission.BLUETOOTH_CONNECT
-            ))
+            )
         } else {
-            requestPermissionLauncher.launch(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION))
+            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
         }
     }
 
@@ -463,8 +581,15 @@ class BluetoothActivity : BaseActivity() {
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { results ->
-            if (results.values.all { it }) syncUIWithService()
-            else Toast.makeText(this, "Bluetooth permission required", Toast.LENGTH_SHORT).show()
+            val granted = requiredBluetoothPermissions().all { permission ->
+                results[permission] == true
+            }
+            if (granted) {
+                ensureServiceBound()
+            } else {
+                showPermissionRequiredState()
+                Toast.makeText(this, "Bluetooth permission required", Toast.LENGTH_SHORT).show()
+            }
         }
 
     // ══════════════════════════════════════════════════════════════════════

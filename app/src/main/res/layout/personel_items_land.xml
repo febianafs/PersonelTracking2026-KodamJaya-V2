@@ -216,6 +216,7 @@
                         android:textColor="#D6DEE8"
                         android:textSize="13sp" />
                 </LinearLayout>
+
             </LinearLayout>
 
             <!-- LAT LONG -->
@@ -337,6 +338,20 @@
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/btnDataSelengkapnya"
+                android:layout_width="94dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="10dp"
+                android:background="@drawable/bg_resolution_active"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="Full Detail"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
             <View
                 android:id="@+id/dotLastSync"

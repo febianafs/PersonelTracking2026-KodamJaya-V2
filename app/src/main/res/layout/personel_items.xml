@@ -213,6 +213,20 @@
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
+            <TextView
+                android:id="@+id/btnDataSelengkapnya"
+                android:layout_width="86dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="8dp"
+                android:background="@drawable/bg_resolution_active"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:text="Full Detail"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
             <View
                 android:id="@+id/dotLastSync"
                 android:layout_width="8dp"
