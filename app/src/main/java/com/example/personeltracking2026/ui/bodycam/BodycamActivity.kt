@@ -3,7 +3,10 @@ package com.example.personeltracking2026.ui.bodycam
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PictureInPictureParams
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Rect
@@ -72,8 +75,19 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
     // =============== LOG OPTIMASI STREAM ===============
     private val statsHandler = Handler(Looper.getMainLooper())
+    private val previewHandler = Handler(Looper.getMainLooper())
     private var streamStartTime = 0L
     private var reconnectCount = 0
+    private var previewRetryCount = 0
+
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_ON,
+                Intent.ACTION_USER_PRESENT -> recoverCameraPreviewAfterResume()
+            }
+        }
+    }
 
     private fun startStreamMonitor() {
 
@@ -168,6 +182,8 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         val RESOLUTION_LD = Pair(640, 360)
         val RESOLUTION_SD = Pair(854, 480)
         val RESOLUTION_HD = Pair(1280, 720)
+        private const val MAX_PREVIEW_RETRIES = 4
+        private const val PREVIEW_RETRY_DELAY_MS = 250L
     }
 
     // ─────────────────────────────────────────────
@@ -280,12 +296,19 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
 
         val glView = binding.surfaceView as OpenGlView
         rtmpCamera = RtmpCamera2(glView, this)
+        registerReceiver(
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+        )
 
-        // SARAN 9: hanya panggil permission request sekali via post,
-        // onResume akan handle resume selanjutnya
         binding.surfaceView.post {
             isSurfaceReady = true
-            checkAndRequestPermissions()
+            binding.surfaceView.postDelayed({
+                checkAndRequestPermissions()
+            }, PREVIEW_RETRY_DELAY_MS)
         }
 
         // Masuk mode PiP ketika menekan tombol Back
@@ -341,7 +364,7 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
             ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED && isCameraEnabled
         ) {
-            startCameraPreview()
+            recoverCameraPreviewAfterResume()
         }
     }
 
@@ -364,9 +387,14 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
         super.onDestroy()
         // SARAN 8: reset isSurfaceReady saat destroy
         isSurfaceReady = false
+        previewHandler.removeCallbacksAndMessages(null)
         if (::rtmpCamera.isInitialized) {
             if (rtmpCamera.isStreaming) rtmpCamera.stopStream()
             if (rtmpCamera.isOnPreview) rtmpCamera.stopPreview()
+        }
+        try {
+            unregisterReceiver(screenReceiver)
+        } catch (_: Exception) {
         }
         updateBodycamStreamState(0)
     }
@@ -407,25 +435,41 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
     //  Camera Preview
     // ─────────────────────────────────────────────
 
-    private fun startCameraPreview() {
+    private fun startCameraPreview(forceRestart: Boolean = false) {
+        if (!::rtmpCamera.isInitialized) return
         if (rtmpCamera.isStreaming) return
-        if (!isSurfaceReady) return
+        if (!isCameraEnabled) return
+        if (!isSurfaceReady) {
+            schedulePreviewRetry(forceRestart)
+            return
+        }
         if (!hasCameraPermission()) {
             permissionLauncher.launch(
                 arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
             )
             return
         }
-        //if (rtmpCamera.isOnPreview) return
+        if (binding.surfaceView.width == 0 || binding.surfaceView.height == 0) {
+            schedulePreviewRetry(forceRestart)
+            return
+        }
+
         val res = if (viewModel.isHdSelected.value) RESOLUTION_HD else RESOLUTION_SD
+
         try {
             if (rtmpCamera.isOnPreview) {
-                return
+                if (!forceRestart) {
+                    previewRetryCount = 0
+                    binding.surfaceView?.visibility = View.VISIBLE
+                    binding.layoutIdle?.visibility = View.GONE
+                    return
+                }
+                rtmpCamera.stopPreview()
             }
 
             Log.d(
                 "RTMP_DEBUG",
-                "startPreview width=${res.first}, height=${res.second}"
+                "startPreview width=${res.second}, height=${res.first}, forceRestart=$forceRestart"
             )
 
             Log.d("ROTATION", CameraHelper.getCameraOrientation(this).toString())
@@ -433,14 +477,77 @@ class BodycamActivity : BaseActivity(), ConnectChecker {
                 CameraHelper.Facing.BACK,
                 res.second,
                 res.first)
+            previewRetryCount = 0
             binding.layoutIdle?.visibility = View.GONE
             binding.surfaceView?.visibility = View.VISIBLE
+            schedulePreviewHealthCheck()
         } catch (e: Exception) {
-            Toast.makeText(this, "Could not open camera: ${e.message}", Toast.LENGTH_SHORT).show()
+            Log.e("RTMP_DEBUG", "Could not open camera", e)
+            if (previewRetryCount < MAX_PREVIEW_RETRIES) {
+                schedulePreviewRetry(forceRestart = true)
+            } else {
+                Toast.makeText(this, "Could not open camera: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun schedulePreviewRetry(forceRestart: Boolean = false) {
+        if (isFinishing || isDestroyed) return
+        if (!isCameraEnabled || viewModel.isLive()) return
+        if (previewRetryCount >= MAX_PREVIEW_RETRIES) {
+            Log.w("RTMP_DEBUG", "preview retry limit reached")
+            return
+        }
+
+        previewRetryCount++
+        val delayMs = PREVIEW_RETRY_DELAY_MS * previewRetryCount
+
+        previewHandler.removeCallbacksAndMessages(null)
+        previewHandler.postDelayed({
+            startCameraPreview(forceRestart)
+        }, delayMs)
+    }
+
+    private fun schedulePreviewHealthCheck() {
+        previewHandler.removeCallbacksAndMessages(null)
+        previewHandler.postDelayed({
+            if (isFinishing || isDestroyed) return@postDelayed
+            if (!isCameraEnabled || viewModel.isLive() || rtmpCamera.isStreaming) return@postDelayed
+
+            if (!rtmpCamera.isOnPreview) {
+                Log.w("RTMP_DEBUG", "preview health check failed, restarting preview")
+                startCameraPreview(forceRestart = true)
+            }
+        }, PREVIEW_RETRY_DELAY_MS * 2)
+    }
+
+    private fun recoverCameraPreviewAfterResume() {
+        if (isFinishing || isDestroyed) return
+        if (isInPictureInPictureMode) return
+        if (!isCameraEnabled || !hasCameraPermission()) return
+
+        binding.surfaceView?.visibility = View.VISIBLE
+        if (viewModel.streamState.value !is StreamState.Ended) {
+            binding.layoutEnded?.visibility = View.GONE
+            binding.layoutIdle?.visibility = View.GONE
+        }
+
+        previewRetryCount = 0
+        previewHandler.removeCallbacksAndMessages(null)
+
+        val delays = longArrayOf(150L, 500L, 1000L)
+        delays.forEach { delayMs ->
+            previewHandler.postDelayed({
+                if (!isFinishing && !isDestroyed && isCameraEnabled && !viewModel.isLive()) {
+                    startCameraPreview(forceRestart = true)
+                }
+            }, delayMs)
         }
     }
 
     private fun stopCameraPreview() {
+        previewHandler.removeCallbacksAndMessages(null)
+        previewRetryCount = 0
         try {
             if (::rtmpCamera.isInitialized && rtmpCamera.isOnPreview) {
                 rtmpCamera.stopPreview()

@@ -11,7 +11,6 @@ import android.view.animation.AnimationUtils
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.personeltracking2026.R
-import com.example.personeltracking2026.core.service.MqttLocationService
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.data.repository.AuthRepository
 import com.example.personeltracking2026.data.repository.Result
@@ -23,7 +22,6 @@ import com.example.personeltracking2026.ui.personel.PersonelActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.provider.Settings
-import com.example.personeltracking2026.App
 import com.example.personeltracking2026.core.navigation.LastScreen
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.pm.PackageInfoCompat
@@ -37,6 +35,8 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import com.example.personeltracking2026.core.network.UpdaterRetrofitClient
 import com.example.personeltracking2026.BuildConfig
+import com.example.personeltracking2026.App
+import com.example.personeltracking2026.core.service.MqttLocationService
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : AppCompatActivity() {

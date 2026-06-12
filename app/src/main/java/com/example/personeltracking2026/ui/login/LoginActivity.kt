@@ -130,7 +130,6 @@ class LoginActivity : AppCompatActivity() {
                             val sessionManager = SessionManager(this@LoginActivity)
 
                             sessionManager.saveSession(token, name)
-
                             sessionManager.savePersonelDetail(
                                 id         = sessionManager.getUserId()?.toString() ?: "",
                                 nrp        = nrp,

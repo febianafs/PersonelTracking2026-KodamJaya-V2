@@ -102,6 +102,7 @@ class PersonelActivity : BaseActivity() {
     private var geoJsonSource: GeoJsonSource? = null
     private var lastAccepted: LocationData? = null
     private val smoothWindow = ArrayDeque<LocationData>()
+    private var activeVitalHolder: TopPagerAdapter.VitalVH? = null
 
     private var isMapStyleReady = false
 
@@ -116,6 +117,7 @@ class PersonelActivity : BaseActivity() {
         val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
                 permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
         if (granted) {
+            startTrackingAfterLocationPermission()
             requestBackgroundLocation()
         }
         else Toast.makeText(this, "Location permission required", Toast.LENGTH_LONG).show()
@@ -163,6 +165,9 @@ class PersonelActivity : BaseActivity() {
         requestBatteryOptimizationExemption()
 
         pagerAdapter = TopPagerAdapter()
+        pagerAdapter.onVitalHolderAttached = { holder ->
+            activeVitalHolder = holder
+        }
         binding.viewPagerTop.adapter = pagerAdapter
 
         binding.indicator?.setViewPager(binding.viewPagerTop)
@@ -241,6 +246,10 @@ class PersonelActivity : BaseActivity() {
             requestLocationPermission()
             return
         }
+        startTrackingAfterLocationPermission()
+    }
+
+    private fun startTrackingAfterLocationPermission() {
         lifecycleScope.launch(Dispatchers.IO) {
             reconnectManager.start()
         }
@@ -366,14 +375,6 @@ class PersonelActivity : BaseActivity() {
 
                             updateCoordinates(it.lat, it.lon)
 
-                            // FIX: Update koordinat ke App level
-                            // agar SosManager bisa baca koordinat terbaru
-                            // dari Activity manapun (termasuk SettingsActivity)
-                            val app = application as App
-                            app.currentLat      = it.lat
-                            app.currentLon      = it.lon
-                            app.currentAccuracy = it.accuracy
-
 //                            if (!SosManager.isActive.value) {
 //                                updateMarker(it.lat, it.lon)
 //                            }
@@ -408,6 +409,8 @@ class PersonelActivity : BaseActivity() {
                                 pagerAdapter.name = sessionManager.getName() ?: "-"
                                 pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
                                 pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+                                pagerAdapter.unit = sessionManager.getUnit().ifBlank { "-" }
+                                pagerAdapter.squad = sessionManager.getRegu().ifBlank { "-" }
 
                                 pagerAdapter.notifyItemChanged(0)
                             }
@@ -453,36 +456,20 @@ class PersonelActivity : BaseActivity() {
                         }
                     }
 
-                    // Observe BPM realtime
-//                    launch {
-//                        BluetoothLeService.bpmValue.collect { bpm ->
-//                            val app = application as App
-//                            // simpan HR terbaru
-//                            app.currentHeartRate = bpm
-//                            app.currentHeartRateTs = System.currentTimeMillis()
-//                            // update ViewModel untuk MQTT
-//                            viewModel.updateHeartRate(
-//                                bpm = bpm,
-//                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: ""
-//                            )
-//                        }
-//                    }
-
-                    // Refresh UI + cek expired
                     launch {
-
-                        while (true) {
-                            val app = application as App
-                            val isExpired =
-                                System.currentTimeMillis() - app.currentHeartRateTs > 30_000
-                            val finalHr = if (isExpired) 0 else app.currentHeartRate
-                            pagerAdapter.bleBpm = finalHr
-                            pagerAdapter.notifyItemChanged(1)
-                            delay(1000)
+                        BluetoothLeService.bpmReading.collect { reading ->
+                            viewModel.updateHeartRate(
+                                bpm = reading.bpm,
+                                deviceName = BluetoothLeService.connectedDevice.value?.name ?: "",
+                                timestamp = reading.timestamp
+                            )
                         }
-                        BluetoothLeService.bpmValue.collect { bpm ->
-                            pagerAdapter.bleBpm = bpm
-                            pagerAdapter.notifyItemChanged(1)
+                    }
+
+                    launch {
+                        val app = application as App
+                        app.effectiveHeartRate.collect { bpm ->
+                            updateBleBpmUi(bpm = bpm, force = true)
                         }
                     }
                 }
@@ -555,8 +542,24 @@ class PersonelActivity : BaseActivity() {
         pagerAdapter.nrp = data.nrp
             ?: sessionManager.getNrp().ifBlank { "-" }
 
-        pagerAdapter.rank = data.rank?.name
-            ?: sessionManager.getRank().ifBlank { "-" }
+        val finalRank = data.getClassification("Rank")
+            .ifBlank { data.rank?.name ?: "" }
+            .ifBlank { sessionManager.getRank() }
+            .ifBlank { "-" }
+
+        val finalUnit = data.getClassification("Unit")
+            .ifBlank { data.unit?.name ?: "" }
+            .ifBlank { sessionManager.getUnit() }
+            .ifBlank { "-" }
+
+        val finalSquad = data.getClassification("Regu")
+            .ifBlank { data.regu?.name ?: "" }
+            .ifBlank { sessionManager.getRegu() }
+            .ifBlank { "-" }
+
+        pagerAdapter.rank = finalRank
+        pagerAdapter.unit = finalUnit
+        pagerAdapter.squad = finalSquad
 
         pagerAdapter.notifyItemChanged(0)
     }
@@ -564,6 +567,19 @@ class PersonelActivity : BaseActivity() {
     private fun updateBattery(percent: Int) {
         pagerAdapter.battery = percent
         pagerAdapter.notifyItemChanged(1)
+    }
+
+    private fun updateBleBpmUi(
+        bpm: Int = (application as App).getHeartRateSnapshot().bpm,
+        force: Boolean = false
+    ) {
+        val app = application as App
+
+        if (force || pagerAdapter.bleBpm != bpm) {
+            pagerAdapter.setBleBpmRealtime(bpm)
+            activeVitalHolder?.updateBpm(bpm)
+            Log.d("HR_UI", "UI BPM=$bpm raw=${app.currentHeartRate} ts=${app.currentHeartRateTs}")
+        }
     }
 
     private fun personelBottomSheet() {
@@ -720,9 +736,6 @@ class PersonelActivity : BaseActivity() {
     private fun updateCoordinates(lat: Double, lon: Double) {
         currentLat = lat
         currentLon = lon
-
-//        binding.tvCoordinates.text  = "$lat,"
-//        binding.tvCoordinates2.text = " $lon"
     }
 
 //    private fun applyMapType(type: MapTypeManager.MapType) {

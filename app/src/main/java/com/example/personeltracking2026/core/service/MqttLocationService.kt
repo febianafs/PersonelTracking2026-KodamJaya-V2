@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.os.BatteryManager
 import android.content.pm.ServiceInfo
 import androidx.core.app.ServiceCompat
 import android.os.Build
@@ -27,6 +26,7 @@ import com.example.personeltracking2026.core.mqtt.MqttPayloadBuilder
 import com.example.personeltracking2026.core.mqtt.MqttReconnectManager
 import com.example.personeltracking2026.core.session.SessionManager
 import com.example.personeltracking2026.core.utils.Constants
+import com.example.personeltracking2026.data.model.LocationData
 import com.example.personeltracking2026.utils.DeviceIdentityManager
 import com.example.personeltracking2026.utils.StreamUtils
 import kotlinx.coroutines.CoroutineScope
@@ -77,6 +77,9 @@ class MqttLocationService : Service() {
     private var lastPublishTime = 0L
     private var publishIntervalMs = 5000L
     private var bodycamPublishJob: Job? = null
+    private var heartRatePublishJob: Job? = null
+    private var lastPublishedHeartRate: Int? = null
+    private var lastHeartRatePublishTime = 0L
 
     private val intervalChangedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -144,6 +147,7 @@ class MqttLocationService : Service() {
                 reconnectManager.start()
                 startLocationUpdates()
                 startBodycamIntervalPublisher()
+                startHeartRateImmediatePublisher()
             }
             ACTION_STOP -> {
                 Log.d(TAG, "Service stopping")
@@ -157,6 +161,7 @@ class MqttLocationService : Service() {
         super.onDestroy()
         reconnectManager.stop()
         bodycamPublishJob?.cancel()
+        heartRatePublishJob?.cancel()
         appLocationManager.stopUpdates()
         serviceScope.cancel()
         if (::wakeLock.isInitialized && wakeLock.isHeld) {
@@ -188,12 +193,14 @@ class MqttLocationService : Service() {
 
         appLocationManager.onLocationUpdate = { lat, lon, accuracy, source ->
             val now = System.currentTimeMillis()
+            val app = application as App
+            app.updateGpsLocation(LocationData(lat, lon, accuracy, source, now))
 
             // THROTTLE: hanya publish kalau sudah lewat interval sejak publish terakhir
             if (now - lastPublishTime >= publishIntervalMs) {
                 lastPublishTime = now
                 Log.d(TAG, "Location [$source]: $lat, $lon → publishing")
-                publishLocation(lat, lon, accuracy)
+                publishLocation()
             } else {
                 Log.d(TAG, "Location [$source]: throttled, skip")
             }
@@ -232,9 +239,15 @@ class MqttLocationService : Service() {
     //  Publish MQTT
     // ─────────────────────────────────────────────
 
-    private fun publishLocation(lat: Double, lon: Double, accuracy: Float) {
+    private fun publishLocation() {
         serviceScope.launch {
             val app = application as App
+            val location = app.gpsState.value
+
+            if (location == null) {
+                Log.d(TAG, "No GPS state yet -> skip publish")
+                return@launch
+            }
 
             if (app.currentMode != DeviceMode.RADIO) {
                 Log.d(TAG, "Not RADIO mode -> skip publish")
@@ -261,26 +274,28 @@ class MqttLocationService : Service() {
 
             val nowMs = System.currentTimeMillis()
 
-            // Baca HR dari App-level state (diisi oleh PersonelViewModel via BLE)
-//            val app          = application as? com.example.personeltracking2026.App
-            val hr           = app?.currentHeartRate   ?: 0
-            val hrTs         = app?.currentHeartRateTs?.takeIf { it > 0 } ?: nowMs
+            val heartRate = app.getHeartRateSnapshot(nowMs)
+            Log.d(
+                "HR_DEBUG",
+                "SERVICE HR=${heartRate.bpm} ts=${heartRate.timestamp} expired=${heartRate.isExpired} now=$nowMs"
+            )
             val payload = MqttPayloadBuilder.buildRadioDataPayload(
                 session      = sessionManager,
                 serialNumber = serialNumber,
                 androidId    = androidId,
-                lat          = lat,
-                lon          = lon,
-                acc          = accuracy,
-                gpsTimestamp = nowMs,
-                heartrate    = hr,
-                heartrateTs  = hrTs,
-                batteryLevel = getBatteryLevel(),
+                lat          = location.lat,
+                lon          = location.lon,
+                acc          = location.accuracy,
+                gpsTimestamp = location.timestamp,
+                heartrate    = heartRate.bpm,
+                heartrateTs  = heartRate.timestamp,
+                batteryLevel = app.batteryState.value.percent,
                 appVersion   = BuildConfig.APP_VERSION,
                 rtmpUrl      = StreamUtils.getRtmpUrl(serialNumber)
             )
 
             mqttManager.publishRadioData(payload)
+            Log.d("MQTT_SOURCE", "PUBLISH FROM SERVICE")
         }
     }
 
@@ -290,6 +305,26 @@ class MqttLocationService : Service() {
             while (true) {
                 publishBodycamDataIfActive()
                 delay(publishIntervalMs)
+            }
+        }
+    }
+
+    private fun startHeartRateImmediatePublisher() {
+        heartRatePublishJob?.cancel()
+        heartRatePublishJob = serviceScope.launch {
+            val app = application as App
+            app.effectiveHeartRate.collect { bpm ->
+                val previousBpm = lastPublishedHeartRate
+                lastPublishedHeartRate = bpm
+
+                if (previousBpm == null || previousBpm == bpm) return@collect
+
+                val now = System.currentTimeMillis()
+                if (now - lastHeartRatePublishTime < 250L) return@collect
+
+                lastHeartRatePublishTime = now
+                Log.d(TAG, "Heart rate changed $previousBpm -> $bpm, immediate MQTT publish")
+                publishLocation()
             }
         }
     }
@@ -327,13 +362,6 @@ class MqttLocationService : Service() {
 
         Log.d(TAG, "BODYCAM publish interval=${publishIntervalMs}ms stream=${app.currentBodycamStream}")
         mqttManager.publishBodycamData(payload)
-    }
-
-    private fun getBatteryLevel(): Int {
-        return try {
-            val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-            bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
-        } catch (e: Exception) { 0 }
     }
 
     private fun parseIntervalToMs(interval: String): Long {

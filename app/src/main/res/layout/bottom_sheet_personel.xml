@@ -1,186 +1,175 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@color/background">
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/background"
+    android:fillViewport="false">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:id="@+id/headerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="120dp"
-
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <ImageView
-            android:id="@+id/imgBanner"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="centerCrop"
-            android:src="@drawable/bg_card_personel" />
-
-        <ImageView
-            android:id="@+id/imgProfile"
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:elevation="8dp"
-            android:src="@drawable/ic_launcher_background"
-
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="@+id/imgBanner"
-            app:layout_constraintStart_toStartOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
-
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:orientation="vertical"
+        android:padding="18dp">
 
-        app:layout_constraintTop_toBottomOf="@id/headerContainer"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        <View
+            android:layout_width="42dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="#3A4652" />
 
-        <!-- NAMA -->
-        <TextView
-            android:id="@+id/labelName"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Name"
-            android:textSize="13sp"
-            android:textColor="#A2A2A2"
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="132dp"
+            android:background="#151E27">
 
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"/>
+            <ImageView
+                android:id="@+id/imgBanner"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0.35"
+                android:scaleType="centerCrop"
+                android:src="@drawable/bg_card_personel" />
 
-        <TextView
-            android:id="@+id/tvName"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Solah Vicenzio"
-            android:textSize="13sp"
-            android:textColor="#FFFFFF"
+            <ImageView
+                android:id="@+id/imgProfile"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:layout_gravity="center"
+                android:scaleType="centerCrop"
+                android:src="@drawable/ic_avatar" />
 
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent"/>
-
-        <!-- NRP -->
-        <TextView
-            android:id="@+id/labelNRP"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="NRP"
-            android:textSize="13sp"
-            android:textColor="#A2A2A2"
-
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/labelName"/>
+        </FrameLayout>
 
         <TextView
-            android:id="@+id/tvNRP"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="123456789"
+            android:layout_marginTop="16dp"
+            android:text="PERSONEL DETAIL"
+            android:textColor="#EAF2FF"
             android:textSize="13sp"
-            android:textColor="#FFFFFF"
+            android:textStyle="bold" />
 
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvName"/>
-
-        <!-- RANK -->
-        <TextView
-            android:id="@+id/labelRank"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Rank"
-            android:textSize="13sp"
-            android:textColor="#A2A2A2"
+            android:layout_marginTop="10dp"
+            android:background="#151E27"
+            android:orientation="vertical"
+            android:padding="14dp">
 
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/labelNRP"/>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:textColor="#AAB4C0"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/tvRank"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Pangkat"
-            android:textSize="13sp"
-            android:textColor="#FFFFFF"
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Solah Vicenzio"
+                android:textColor="#EAF2FF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
 
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvNRP"/>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="12dp"
+                android:background="#223142" />
 
-        <!-- UNIT -->
-        <TextView
-            android:id="@+id/labelUnit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Unit"
-            android:textSize="13sp"
-            android:textColor="#A2A2A2"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="NRP"
+                android:textColor="#AAB4C0"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/labelRank"/>
+            <TextView
+                android:id="@+id/tvNRP"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="123456789"
+                android:textColor="#D6DEE8"
+                android:textSize="14sp" />
 
-        <TextView
-            android:id="@+id/tvUnit"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Infanteri"
-            android:textSize="13sp"
-            android:textColor="#FFFFFF"
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="12dp"
+                android:background="#223142" />
 
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvRank"/>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Rank"
+                android:textColor="#AAB4C0"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-        <!-- SQUAD -->
-        <TextView
-            android:id="@+id/labelSquad"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Squad"
-            android:textSize="13sp"
-            android:textColor="#A2A2A2"
+            <TextView
+                android:id="@+id/tvRank"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Pangkat"
+                android:textColor="#D6DEE8"
+                android:textSize="14sp" />
 
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/labelUnit"/>
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="12dp"
+                android:background="#223142" />
 
-        <TextView
-            android:id="@+id/tvSquad"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Tim Aplha"
-            android:textSize="13sp"
-            android:textColor="#FFFFFF"
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Unit"
+                android:textColor="#AAB4C0"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvUnit"/>
+            <TextView
+                android:id="@+id/tvUnit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Unit"
+                android:textColor="#D6DEE8"
+                android:textSize="14sp" />
 
-<!--        &lt;!&ndash; STATUS &ndash;&gt;-->
-<!--        <TextView-->
-<!--            android:id="@+id/labelStatus"-->
-<!--            android:layout_width="wrap_content"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:text="Status"-->
-<!--            android:textSize="13sp"-->
-<!--            android:textColor="#A2A2A2"-->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginVertical="12dp"
+                android:background="#223142" />
 
-<!--            app:layout_constraintStart_toStartOf="parent"-->
-<!--            app:layout_constraintTop_toBottomOf="@id/labelSquad"/>-->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Squad"
+                android:textColor="#AAB4C0"
+                android:textSize="11sp"
+                android:textStyle="bold" />
 
-<!--        <TextView-->
-<!--            android:id="@+id/tvPersonelStatus"-->
-<!--            android:layout_width="wrap_content"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:text="Active"-->
-<!--            android:textSize="13sp"-->
-<!--            android:textColor="#FFFFFF"-->
+            <TextView
+                android:id="@+id/tvSquad"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Squad"
+                android:textColor="#D6DEE8"
+                android:textSize="14sp" />
 
-<!--            app:layout_constraintEnd_toEndOf="parent"-->
-<!--            app:layout_constraintTop_toBottomOf="@id/tvSquad"/>-->
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</androidx.constraintlayout.widget.ConstraintLayout>
+        </LinearLayout>
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
