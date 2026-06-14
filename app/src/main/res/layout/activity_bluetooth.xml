@@ -193,7 +193,7 @@
                         </RelativeLayout>
 
                         <!-- Animasi ripple + icon bluetooth -->
-                        <com.example.personeltracking2026.ui.bluetooth.BluetoothScanView
+                        <com.example.personeltracking2026kodamjayav2.ui.bluetooth.BluetoothScanView
                             android:id="@+id/bluetoothScanView"
                             android:layout_width="120dp"
                             android:layout_height="120dp"

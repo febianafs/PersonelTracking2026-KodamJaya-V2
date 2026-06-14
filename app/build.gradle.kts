@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.personeltracking2026"
+    namespace = "com.example.personeltracking2026kodamjayav2"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.personeltracking2026"
+        applicationId = "com.example.personeltracking2026kodamjayav2"
         minSdk = 24
         targetSdk = 36
 
