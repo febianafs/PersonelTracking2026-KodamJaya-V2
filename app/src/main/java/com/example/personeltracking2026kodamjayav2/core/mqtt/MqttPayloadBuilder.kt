@@ -8,6 +8,7 @@ import com.example.personeltracking2026kodamjayav2.data.model.RadioDataPayload
 import com.example.personeltracking2026kodamjayav2.data.model.RadioHealthPayload
 import com.example.personeltracking2026kodamjayav2.data.model.RadioSosPayload
 import com.example.personeltracking2026kodamjayav2.data.model.StreamPayload
+import com.example.personeltracking2026kodamjayav2.utils.AvatarUrlResolver
 
 /**
  * Helper untuk build payload MQTT dari state yang ada di app.
@@ -57,9 +58,9 @@ object MqttPayloadBuilder {
             divisi     = session.getDivisi(),
             brigade    = session.getBrigade(),
             team       = session.getTeam(),
-            unit       = session.getUnit(),
+            unit       = session.getSatuan().ifBlank { session.getUnit() },
             rank       = session.getRank(),
-            avatarUrl  = session.getAvatarUrl()
+            avatarUrl  = AvatarUrlResolver.resolve(session.getAvatarUrl()).orEmpty()
         )
 
         return RadioDataPayload(
@@ -112,7 +113,7 @@ object MqttPayloadBuilder {
             androidId    = androidId,
             id           = session.getUserId()?.toString() ?: "",
             name         = session.getName() ?: "",
-            avatarUrl    = session.getAvatarUrl() ?: "",
+            avatarUrl    = AvatarUrlResolver.resolve(session.getAvatarUrl()).orEmpty(),
             sos          = sos,
             latitude     = lat,
             longitude    = lon,

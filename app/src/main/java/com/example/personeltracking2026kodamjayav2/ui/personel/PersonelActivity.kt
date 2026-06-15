@@ -48,6 +48,7 @@ import com.example.personeltracking2026kodamjayav2.databinding.ActivityPersonelB
 import com.example.personeltracking2026kodamjayav2.ui.bluetooth.BluetoothLeService
 import com.example.personeltracking2026kodamjayav2.ui.settings.SettingsActivity
 import com.example.personeltracking2026kodamjayav2.utils.DeviceIdentityManager
+import com.example.personeltracking2026kodamjayav2.utils.AvatarUrlResolver
 import com.example.personeltracking2026kodamjayav2.utils.drawableToBitmap
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -165,6 +166,7 @@ class PersonelActivity : BaseActivity() {
         requestBatteryOptimizationExemption()
 
         pagerAdapter = TopPagerAdapter()
+        bindSessionProfile()
         pagerAdapter.onVitalHolderAttached = { holder ->
             activeVitalHolder = holder
         }
@@ -405,13 +407,7 @@ class PersonelActivity : BaseActivity() {
 
                             is PersonelState.Error -> {
                                 binding.swipeRefresh?.isRefreshing = false
-
-                                pagerAdapter.name = sessionManager.getName() ?: "-"
-                                pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
-                                pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
-                                pagerAdapter.unit = sessionManager.getUnit().ifBlank { "-" }
-                                pagerAdapter.squad = sessionManager.getRegu().ifBlank { "-" }
-
+                                bindSessionProfile()
                                 pagerAdapter.notifyItemChanged(0)
                             }
                         }
@@ -505,31 +501,26 @@ class PersonelActivity : BaseActivity() {
         viewModel.loadPersonelDetail(userId, token)
     }
 
-    private fun resolveCmsImageUrl(path: String?): String? {
-        if (path.isNullOrBlank()) return null
-
-        return if (path.startsWith("http://") || path.startsWith("https://")) {
-            path
-        } else {
-            "https://cms.aturwalpat.com/images/${path.trimStart('/')}"
-        }
+    private fun bindSessionProfile() {
+        pagerAdapter.name = sessionManager.getName() ?: "-"
+        pagerAdapter.nrp = sessionManager.getNrp().ifBlank { "-" }
+        pagerAdapter.rank = sessionManager.getRank().ifBlank { "-" }
+        pagerAdapter.unit = sessionManager.getUnit().ifBlank { "-" }
+        pagerAdapter.squad = sessionManager.getRegu().ifBlank { "-" }
+        pagerAdapter.avatarUrl = sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
     }
 
     private fun bindPersonelData(data: PersonelData) {
-        val avatarFromApi = resolveCmsImageUrl(data.avatar_url ?: data.image)
-        val avatarFromSession = sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
-
-        val finalAvatar = avatarFromApi ?: avatarFromSession
+        val avatarFromApi = AvatarUrlResolver.resolve(data.avatar_url ?: data.image)
+        val avatarFromLogin = sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
+        val finalAvatar = avatarFromApi ?: avatarFromLogin
 
         Log.d("AVATAR_CHECK", "avatarFromApi = $avatarFromApi")
-        Log.d("AVATAR_CHECK", "avatarFromSession = $avatarFromSession")
+        Log.d("AVATAR_CHECK", "avatarFromLogin = $avatarFromLogin")
         Log.d("AVATAR_CHECK", "finalAvatar = $finalAvatar")
 
         pagerAdapter.avatarUrl = finalAvatar
-
-        finalAvatar?.let {
-            sessionManager.saveAvatar(it)
-        }
+        sessionManager.saveAvatar(finalAvatar)
 
         val finalName = data.full_name
             ?: data.name
@@ -547,7 +538,9 @@ class PersonelActivity : BaseActivity() {
             .ifBlank { sessionManager.getRank() }
             .ifBlank { "-" }
 
-        val finalUnit = data.getClassification("Unit")
+        val finalUnit = data.getClassification("Satuan")
+            .ifBlank { data.satuan?.name ?: "" }
+            .ifBlank { data.getClassification("Unit") }
             .ifBlank { data.unit?.name ?: "" }
             .ifBlank { sessionManager.getUnit() }
             .ifBlank { "-" }
@@ -602,7 +595,9 @@ class PersonelActivity : BaseActivity() {
             .ifBlank { sessionManager.getRank() }
             .ifBlank { "-" }
 
-        val unit = personel.getClassification("Unit")
+        val unit = personel.getClassification("Satuan")
+            .ifBlank { personel?.satuan?.name ?: "" }
+            .ifBlank { personel.getClassification("Unit") }
             .ifBlank { personel?.unit?.name ?: "" }
             .ifBlank { sessionManager.getUnit() }
             .ifBlank { "-" }
@@ -618,13 +613,15 @@ class PersonelActivity : BaseActivity() {
         view.findViewById<TextView>(R.id.tvUnit).text  = unit
         view.findViewById<TextView>(R.id.tvSquad).text = regu
 
-        val avatarUrl = resolveCmsImageUrl(personel?.avatar_url ?: personel?.image)
+        val avatarUrl = AvatarUrlResolver.resolve(personel?.avatar_url ?: personel?.image)
             ?: sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
 
         val imgProfile = view.findViewById<ImageView>(R.id.imgProfile)
         if (!avatarUrl.isNullOrBlank()) {
             Glide.with(this)
                 .load(avatarUrl)
+                .diskCacheStrategy(DiskCacheStrategy.NONE)
+                .skipMemoryCache(true)
                 .placeholder(R.drawable.ic_avatar)
                 .error(R.drawable.ic_avatar)
                 .dontAnimate()

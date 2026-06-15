@@ -9,7 +9,6 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import android.widget.ImageView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.personeltracking2026kodamjayav2.R
 import com.example.personeltracking2026kodamjayav2.ui.settings.SettingsActivity
 import java.util.Locale
@@ -141,6 +140,7 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         private val tvCoordinates2 = itemView.findViewById<TextView?>(R.id.tvCoordinates2)
         private val dot        = itemView.findViewById<View>(R.id.dotLastSync)
         private val btnFullData = itemView.findViewById<TextView?>(R.id.btnDataSelengkapnya)
+        private var loadedAvatarUrl: String? = null
 
         fun bind(
             name: String,
@@ -167,13 +167,9 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             tvCoordinates2?.text = String.format(Locale.US, "%.7f", longitude)
 
             imgAvatar?.let { imageView ->
-                val previousAvatarUrl = imageView.tag as? String
-
                 if (!avatarUrl.isNullOrBlank()) {
-                    // Jangan load ulang kalau URL avatar masih sama
-                    if (previousAvatarUrl != avatarUrl) {
-                        imageView.tag = avatarUrl
-
+                    if (loadedAvatarUrl != avatarUrl) {
+                        loadedAvatarUrl = avatarUrl
                         Glide.with(itemView.context)
                             .load(avatarUrl)
                             .placeholder(R.drawable.ic_avatar)
@@ -181,8 +177,9 @@ class TopPagerAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                             .dontAnimate()
                             .into(imageView)
                     }
-                } else {
-                    imageView.tag = null
+                } else if (loadedAvatarUrl != null) {
+                    loadedAvatarUrl = null
+                    Glide.with(itemView.context).clear(imageView)
                     imageView.setImageResource(R.drawable.ic_avatar)
                 }
             }

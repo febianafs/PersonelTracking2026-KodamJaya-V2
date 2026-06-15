@@ -388,7 +388,7 @@ class MqttManager(private val context: Context) {
             put("android_id", p.androidId)
             put("id", p.id)
             put("name", p.name)
-            put("avatar", p.avatarUrl)
+            put("avatar_url", p.avatarUrl)
             put("sos", p.sos)
             put("latitude", p.latitude)
             put("longitude", p.longitude)

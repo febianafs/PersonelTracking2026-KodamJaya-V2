@@ -16,6 +16,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.example.personeltracking2026kodamjayav2.App
 import com.example.personeltracking2026kodamjayav2.R
 import com.example.personeltracking2026kodamjayav2.core.session.SessionManager
+import com.example.personeltracking2026kodamjayav2.utils.AvatarUrlResolver
 import com.example.personeltracking2026kodamjayav2.data.model.getClassification
 import com.example.personeltracking2026kodamjayav2.data.repository.LoginRepository
 import com.example.personeltracking2026kodamjayav2.data.repository.Result
@@ -107,7 +108,7 @@ class LoginActivity : AppCompatActivity() {
 
                             val profile = state.data.data?.profile
 
-                            val avatarUrl = profile?.avatar_url ?: ""
+                            val avatarUrl = AvatarUrlResolver.resolve(profile?.avatar_url) ?: ""
                             Log.d("LOGIN_PROFILE", profile.toString())
                             Log.d("LOGIN_AVATAR_RAW", profile?.avatar_url ?: "NULL")
 
@@ -124,7 +125,9 @@ class LoginActivity : AppCompatActivity() {
                             val divisi   = profile.getClassification("Divisi")
                             val brigade  = profile.getClassification("Brigade")
                             val team     = profile.getClassification("Team")
-                            val unit     = profile.getClassification("Unit")
+                            val unit     = satuan.ifBlank {
+                                profile.getClassification("Unit")
+                            }
                             val rank     = profile.getClassification("Rank")
 
                             val sessionManager = SessionManager(this@LoginActivity)

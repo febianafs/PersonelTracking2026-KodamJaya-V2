@@ -62,7 +62,7 @@ data class RadioSosPayload(
     @SerializedName("android_id")     val androidId: String,
     @SerializedName("id")            val id: String,
     @SerializedName("name")          val name: String,
-    @SerializedName("avatar")        val avatarUrl: String,
+    @SerializedName("avatar_url")    val avatarUrl: String,
     @SerializedName("sos")           val sos: Int,
     @SerializedName("latitude")      val latitude: Double,
     @SerializedName("longitude")     val longitude: Double,

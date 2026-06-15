@@ -136,7 +136,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- CAMERA CARD — 1:1 ratio -->
+        <!-- CAMERA CARD -->
         <androidx.cardview.widget.CardView
             android:id="@+id/cameraCard"
             android:layout_width="0dp"
@@ -149,8 +149,9 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toStartOf="@id/controlPanel"
-            app:layout_constraintDimensionRatio="1:1"
+            app:layout_constraintDimensionRatio="W,16:9"
             app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_constraintHorizontal_bias="0.5"
             app:layout_constraintVertical_bias="0.5">
 
             <FrameLayout
@@ -158,11 +159,12 @@
                 android:layout_height="match_parent">
 
                 <!-- CAMERA PREVIEW -->
-                <SurfaceView
+                <com.pedro.library.view.OpenGlView
                     android:id="@+id/surfaceView"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:visibility="gone" />
+                    android:layout_gravity="center"
+                    android:visibility="visible" />
 
                 <!-- STATE IDLE -->
                 <LinearLayout

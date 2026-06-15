@@ -21,6 +21,7 @@ import com.example.personeltracking2026kodamjayav2.data.model.RadioDataPayload
 import com.example.personeltracking2026kodamjayav2.data.model.getClassification
 import com.example.personeltracking2026kodamjayav2.data.repository.LocationRepository
 import com.example.personeltracking2026kodamjayav2.data.repository.PersonelRepository
+import com.example.personeltracking2026kodamjayav2.utils.AvatarUrlResolver
 import com.example.personeltracking2026kodamjayav2.data.repository.Result
 import com.example.personeltracking2026kodamjayav2.utils.DeviceIdentityManager
 import com.example.personeltracking2026kodamjayav2.utils.StreamUtils
@@ -255,7 +256,7 @@ class PersonelViewModel(
                         ?: data.name
                         ?: sessionManager.getName()
 
-                    val safeAvatar = resolveCmsImageUrl(data.avatar_url ?: data.image)
+                    val safeAvatar = AvatarUrlResolver.resolve(data.avatar_url ?: data.image)
                         ?: sessionManager.getAvatarUrl().takeIf { it.isNotBlank() }
 
                     sessionManager.saveName(safeName)
@@ -269,7 +270,8 @@ class PersonelViewModel(
                         .ifBlank { data.rank?.name ?: "" }
                         .ifBlank { sessionManager.getRank() }
 
-                    val unit = data.getClassification("Unit")
+                    val unit = satuan
+                        .ifBlank { data.getClassification("Unit") }
                         .ifBlank { data.unit?.name ?: "" }
                         .ifBlank { sessionManager.getUnit() }
 
@@ -330,16 +332,6 @@ class PersonelViewModel(
                 }
                 else -> {}
             }
-        }
-    }
-
-    private fun resolveCmsImageUrl(path: String?): String? {
-        if (path.isNullOrBlank()) return null
-
-        return if (path.startsWith("http://") || path.startsWith("https://")) {
-            path
-        } else {
-            "https://cms.aturwalpat.com/images/${path.trimStart('/')}"
         }
     }
 

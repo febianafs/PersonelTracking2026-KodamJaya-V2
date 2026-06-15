@@ -2,6 +2,7 @@ package com.example.personeltracking2026kodamjayav2.core.session
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.personeltracking2026kodamjayav2.utils.AvatarUrlResolver
 
 class SessionManager(context: Context) {
 
@@ -180,13 +181,18 @@ class SessionManager(context: Context) {
         prefs.getString(KEY_TEAM, "") ?: ""
 
     fun getUnit(): String =
-        prefs.getString(KEY_UNIT, "") ?: ""
+        (prefs.getString(KEY_UNIT, "") ?: "")
+            .ifBlank { getSatuan() }
 
     fun getRank(): String =
         prefs.getString(KEY_RANK, "") ?: ""
 
-    fun getAvatarUrl(): String =
-        prefs.getString(KEY_AVATAR_URL, "") ?: ""
+    fun getAvatarUrl(): String {
+        val savedUrl = prefs.getString(KEY_AVATAR_URL, "") ?: ""
+        val resolvedUrl = AvatarUrlResolver.resolve(savedUrl).orEmpty()
+        if (resolvedUrl != savedUrl) saveAvatar(resolvedUrl)
+        return resolvedUrl
+    }
 
     // ─── CLEAR ───────────────────────────────────────────────────────────────
 
