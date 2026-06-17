@@ -20,6 +20,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Personel Tracking 2026"
+rootProject.name = "Personel Tracking 2026 Kodam Jaya 2026"
 include(":app")
  
